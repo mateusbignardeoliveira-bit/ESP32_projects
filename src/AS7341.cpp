@@ -1,82 +1,128 @@
-#include <Arduino.h>
-#include <Wire.h>
-#include <Debug.h>
-#include "DEV_Config.h"
-#include "Waveshare_AS7341.h"
+#include "AS7341.h"
 
-#define TCA9548A_ADDR 0x70
-#define TCA_CHANNEL 2
 
-// Seleciona um canal do TCA9548A
-void tcaSelect(uint8_t channel)
+
+AS7341::AS7341(TCA& multiplexador) : tca(multiplexador)
 {
-    if (channel > 7) return;
 
-    Wire.beginTransmission(TCA9548A_ADDR);
-    Wire.write(1 << channel);
-    Wire.endTransmission();
+    canal = 0;
+
+
+    dados =
+    {
+        0,0,0,0,
+        0,0,0,0,
+        0,0
+    };
+
 }
 
-void setup()
+
+
+
+void AS7341::begin(uint8_t canalTCA)
 {
-    Serial.begin(115200);
 
-    // Inicializa a biblioteca
-    DEV_ModuleInit();
+    canal = canalTCA;
 
-    // Seleciona o canal onde está o AS7341
-    tcaSelect(TCA_CHANNEL);
 
-    Serial.println("Inicializando AS7341...");
+    // Seleciona o sensor correto no TCA
+    tca.selecionarCanal(canal);
+
+
+
+    // Inicialização da biblioteca Waveshare
 
     AS7341_Init(eSpm);
+
+
+
+    // Configurações vindas do seu código funcional
+
     AS7341_ATIME_config(100);
+
     AS7341_ASTEP_config(999);
+
     AS7341_AGAIN_config(6);
+
+
+
+    // Mantém o LED interno habilitado inicialmente
+
     AS7341_EnableLED(true);
 
-    Serial.println("AS7341 inicializado!");
 }
 
-void loop()
-{
-    // Garante que o canal correto está selecionado
-    tcaSelect(TCA_CHANNEL);
 
-    AS7341_ControlLed(false, 10);
+
+
+
+void AS7341::update()
+{
+
+    // Sempre garante que o sensor correto está selecionado
+
+    tca.selecionarCanal(canal);
+
+
 
     sModeOneData_t data1;
+
     sModeTwoData_t data2;
 
+
+
+    // Primeira parte da leitura
+
     AS7341_startMeasure(eF1F4ClearNIR);
+
+
     data1 = AS7341_ReadSpectralDataOne();
 
-    Serial.print("F1: ");
-    Serial.println(data1.channel1);
-    Serial.print("F2: ");
-    Serial.println(data1.channel2);
-    Serial.print("F3: ");
-    Serial.println(data1.channel3);
-    Serial.print("F4: ");
-    Serial.println(data1.channel4);
+
+
+    dados.F1 = data1.channel1;
+
+    dados.F2 = data1.channel2;
+
+    dados.F3 = data1.channel3;
+
+    dados.F4 = data1.channel4;
+
+
+
+    // Segunda parte da leitura
 
     AS7341_startMeasure(eF5F8ClearNIR);
+
+
     data2 = AS7341_ReadSpectralDataTwo();
 
-    Serial.print("F5: ");
-    Serial.println(data2.channel5);
-    Serial.print("F6: ");
-    Serial.println(data2.channel6);
-    Serial.print("F7: ");
-    Serial.println(data2.channel7);
-    Serial.print("F8: ");
-    Serial.println(data2.channel8);
-    Serial.print("Clear: ");
-    Serial.println(data2.CLEAR);
-    Serial.print("NIR: ");
-    Serial.println(data2.NIR);
 
-    Serial.println("-------------------------");
 
-    delay(500);
+    dados.F5 = data2.channel5;
+
+    dados.F6 = data2.channel6;
+
+    dados.F7 = data2.channel7;
+
+    dados.F8 = data2.channel8;
+
+
+
+    dados.clear = data2.CLEAR;
+
+    dados.nir = data2.NIR;
+
+}
+
+
+
+
+
+AS7341Data AS7341::getData()
+{
+
+    return dados;
+
 }
