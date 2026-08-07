@@ -3,8 +3,8 @@
 HardwareSerial MotorSerial(2);
 
 // UART2
-#define RX_PIN 16
-#define TX_PIN 17
+#define RX_PIN 5
+#define TX_PIN 18
 
 void sendCommand(String cmd)
 {
