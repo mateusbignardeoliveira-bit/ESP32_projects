@@ -5,8 +5,8 @@
 // $A,x1:4096,x2:4096,x3:4096,x4:4096,x5:4096,x6:4096,x7:4096,x8:4096#
 // Extrai os números e guarda em s1..s8
 
-#define RX2_PIN 16     
-#define TX2_PIN 17     
+#define RX2_PIN 5     
+#define TX2_PIN 18     
 #define BAUD 115200    
 
 void processarPacote();

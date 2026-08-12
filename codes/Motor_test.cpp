@@ -3,8 +3,8 @@
 HardwareSerial MotorSerial(2);
 
 // UART2
-#define RX_PIN 5
-#define TX_PIN 18
+#define RX_PIN 16
+#define TX_PIN 17
 
 void sendCommand(String cmd)
 {
@@ -60,7 +60,8 @@ void setup()
 
   sendCommand("$spd:0,0,0,0#");
 
-  Serial.println("Motor 1 em velocidade 500");
+  sendCommand("$upload:0,0,1#");
+
 }
 
 
