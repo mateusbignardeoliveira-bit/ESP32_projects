@@ -1,6 +1,9 @@
 #include "TOF200F.h"
 
 
+// ============================================================
+// CONSTRUTOR
+// ============================================================
 
 TOF200F::TOF200F(TCA& multiplexador)
 :
@@ -9,13 +12,11 @@ tca(multiplexador)
 
     canal = 0;
 
-
     indiceLeitura = 0;
 
     totalSoma = 0;
 
     distanciaAtual = 0;
-
 
 
     for(int i = 0; i < NUM_LEITURAS; i++)
@@ -26,7 +27,9 @@ tca(multiplexador)
 }
 
 
-
+// ============================================================
+// BEGIN
+// ============================================================
 
 bool TOF200F::begin(uint8_t canalTCA)
 {
@@ -34,13 +37,19 @@ bool TOF200F::begin(uint8_t canalTCA)
     canal = canalTCA;
 
 
+    // --------------------------------------------------------
+    // Seleciona canal do TCA
+    // --------------------------------------------------------
 
-    // Seleciona o canal do TCA
-    tca.selecionarCanal(canal);
+    if(!tca.selecionarCanal(canal))
+    {
+        return false;
+    }
 
 
-
+    // --------------------------------------------------------
     // Inicializa VL53L0X
+    // --------------------------------------------------------
 
     if(!lox.begin(0x29))
     {
@@ -48,11 +57,31 @@ bool TOF200F::begin(uint8_t canalTCA)
     }
 
 
+    // --------------------------------------------------------
+    // Timing
+    //
+    // 33 ms é muito mais adequado para o robô do que
+    // os 200 ms anteriores.
+    // --------------------------------------------------------
 
-    // Mesmo ajuste do seu código original
+    lox.setMeasurementTimingBudgetMicroSeconds(33000);
 
-    lox.setMeasurementTimingBudgetMicroSeconds(200000);
 
+    // --------------------------------------------------------
+    // Inicializa filtro
+    // --------------------------------------------------------
+
+    indiceLeitura = 0;
+
+    totalSoma = 0;
+
+    distanciaAtual = 0;
+
+
+    for(int i = 0; i < NUM_LEITURAS; i++)
+    {
+        leituras[i] = 0;
+    }
 
 
     return true;
@@ -60,80 +89,109 @@ bool TOF200F::begin(uint8_t canalTCA)
 }
 
 
-
+// ============================================================
+// UPDATE
+// ============================================================
 
 void TOF200F::update()
 {
 
-    // Garante que estamos falando com o TOF
+    // --------------------------------------------------------
+    // Seleciona o canal do TOF
+    // --------------------------------------------------------
 
-    tca.selecionarCanal(canal);
-
+    if(!tca.selecionarCanal(canal))
+    {
+        return;
+    }
 
 
     VL53L0X_RangingMeasurementData_t medida;
 
 
+    // --------------------------------------------------------
+    // Faz uma medição
+    // --------------------------------------------------------
 
-    lox.rangingTest(&medida, false);
+    lox.rangingTest(
+        &medida,
+        false
+    );
 
 
+    // --------------------------------------------------------
+    // Verifica validade
+    // --------------------------------------------------------
 
-    if(medida.RangeStatus != 4)
+    if(medida.RangeStatus == 4)
     {
+        // Não atualiza a distância.
+        // Mantém a última leitura válida.
 
-
-        int leituraBruta = medida.RangeMilliMeter;
-
-
-
-        int leituraCalibrada = leituraBruta + OFFSET_CORRECAO_MM;
-
-
-
-        if(leituraCalibrada < 0)
-        {
-            leituraCalibrada = 0;
-        }
-
-
-
-        // Remove leitura antiga
-        totalSoma -= leituras[indiceLeitura];
-
-
-
-        // Coloca nova leitura
-        leituras[indiceLeitura] = leituraCalibrada;
-
-
-
-        totalSoma += leituras[indiceLeitura];
-
-
-
-        indiceLeitura++;
-
-
-
-        if(indiceLeitura >= NUM_LEITURAS)
-        {
-            indiceLeitura = 0;
-        }
-
-
-
-        distanciaAtual = totalSoma / NUM_LEITURAS;
-
+        return;
     }
+
+
+    int leituraBruta =
+        medida.RangeMilliMeter;
+
+
+    // --------------------------------------------------------
+    // Correção
+    // --------------------------------------------------------
+
+    int leituraCalibrada =
+        leituraBruta + OFFSET_CORRECAO_MM;
+
+
+    if(leituraCalibrada < 0)
+    {
+        leituraCalibrada = 0;
+    }
+
+
+    // --------------------------------------------------------
+    // Filtro de média móvel
+    // --------------------------------------------------------
+
+    totalSoma -=
+        leituras[indiceLeitura];
+
+
+    leituras[indiceLeitura] =
+        leituraCalibrada;
+
+
+    totalSoma +=
+        leituras[indiceLeitura];
+
+
+    indiceLeitura++;
+
+
+    if(indiceLeitura >= NUM_LEITURAS)
+    {
+        indiceLeitura = 0;
+    }
+
+
+    // --------------------------------------------------------
+    // Média
+    // --------------------------------------------------------
+
+    distanciaAtual =
+        totalSoma / NUM_LEITURAS;
 
 }
 
 
-
-
+// ============================================================
+// GET DISTANCE
+// ============================================================
 
 int TOF200F::getDistance()
 {
+
     return distanciaAtual;
+
 }

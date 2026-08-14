@@ -1,6 +1,9 @@
 #include "MotorControlador.h"
 
 
+// ============================================================
+// CONSTRUTOR
+// ============================================================
 
 MotorControlador::MotorControlador(
     HardwareSerial& portaSerial,
@@ -13,19 +16,43 @@ serial(portaSerial)
 {
 
     rxPin = RX;
-
     txPin = TX;
-
     baud = velocidade;
+
+
+    // --------------------------------------------------------
+    // Limite utilizado pelo robô
+    //
+    // O driver aceita valores maiores, mas deixamos isso
+    // controlado pela classe.
+    // --------------------------------------------------------
+
+    velocidadeMaxima = 1000;
+
+
+    // --------------------------------------------------------
+    // Últimos comandos
+    // --------------------------------------------------------
+
+    ultimoM1 = 0;
+    ultimoM2 = 0;
+    ultimoM3 = 0;
+    ultimoM4 = 0;
 
 }
 
 
 
+// ============================================================
+// BEGIN
+// ============================================================
 
 void MotorControlador::begin()
 {
 
+    // --------------------------------------------------------
+    // Inicializa UART
+    // --------------------------------------------------------
 
     serial.begin(
         baud,
@@ -35,62 +62,88 @@ void MotorControlador::begin()
     );
 
 
-
     delay(1000);
 
 
+    // ========================================================
+    // CONFIGURAÇÃO DO DRIVER YAHBOOM
+    // ========================================================
 
-    // Configuração do driver
 
+    // --------------------------------------------------------
+    // Tipo do motor
+    // Motor 310
+    // --------------------------------------------------------
 
     enviarComando("$mtype:2#");
 
-
     delay(300);
 
+
+    // --------------------------------------------------------
+    // Encoder
+    // 13 linhas
+    // --------------------------------------------------------
 
     enviarComando("$mline:13#");
 
-
     delay(300);
 
+
+    // --------------------------------------------------------
+    // Redução
+    // 1:20
+    // --------------------------------------------------------
 
     enviarComando("$mphase:20#");
 
-
     delay(300);
 
+
+    // --------------------------------------------------------
+    // Diâmetro da roda
+    // 48 mm
+    // --------------------------------------------------------
 
     enviarComando("$wdiameter:48#");
 
-
     delay(300);
 
+
+    // --------------------------------------------------------
+    // Deadzone
+    // --------------------------------------------------------
 
     enviarComando("$deadzone:1600#");
 
-
     delay(300);
 
+
+    // --------------------------------------------------------
+    // PID interno do driver
+    // --------------------------------------------------------
 
     enviarComando("$MPID:0.8,0.06,0.5#");
 
-
     delay(300);
 
 
+    // --------------------------------------------------------
+    // Segurança:
+    // começa com todos os motores parados
+    // --------------------------------------------------------
 
-    // Para os motores ao iniciar
-
-    setSpeed(0,0,0,0);
+    stop();
 
 }
 
 
 
+// ============================================================
+// ENVIAR COMANDO
+// ============================================================
 
-
-void MotorControlador::enviarComando(String comando)
+void MotorControlador::enviarComando(const char* comando)
 {
 
     serial.print(comando);
@@ -99,7 +152,34 @@ void MotorControlador::enviarComando(String comando)
 
 
 
+// ============================================================
+// LIMITAR VELOCIDADE
+// ============================================================
 
+int MotorControlador::limitarVelocidade(int velocidade)
+{
+
+    if(velocidade > velocidadeMaxima)
+    {
+        return velocidadeMaxima;
+    }
+
+
+    if(velocidade < -velocidadeMaxima)
+    {
+        return -velocidadeMaxima;
+    }
+
+
+    return velocidade;
+
+}
+
+
+
+// ============================================================
+// SET SPEED
+// ============================================================
 
 void MotorControlador::setSpeed(
     int m1,
@@ -109,23 +189,123 @@ void MotorControlador::setSpeed(
 )
 {
 
-    String comando =
-        "$spd:" +
-        String(m1) + "," +
-        String(m2) + "," +
-        String(m3) + "," +
-        String(m4) +
-        "#";
+    // --------------------------------------------------------
+    // Limita velocidades
+    // --------------------------------------------------------
+
+    m1 = limitarVelocidade(m1);
+    m2 = limitarVelocidade(m2);
+    m3 = limitarVelocidade(m3);
+    m4 = limitarVelocidade(m4);
 
 
+    // --------------------------------------------------------
+    // Guarda último comando
+    // --------------------------------------------------------
 
-    enviarComando(comando);
+    ultimoM1 = m1;
+    ultimoM2 = m2;
+    ultimoM3 = m3;
+    ultimoM4 = m4;
+
+
+    // --------------------------------------------------------
+    // Monta comando do driver
+    //
+    // $spd:M1,M2,M3,M4#
+    // --------------------------------------------------------
+
+    String comando = "$spd:";
+
+    comando += String(m1);
+    comando += ",";
+    comando += String(m2);
+    comando += ",";
+    comando += String(m3);
+    comando += ",";
+    comando += String(m4);
+    comando += "#";
+
+
+    enviarComando(comando.c_str());
 
 }
 
 
 
+// ============================================================
+// STOP
+// ============================================================
 
+void MotorControlador::stop()
+{
+
+    setSpeed(
+        0,
+        0,
+        0,
+        0
+    );
+
+}
+
+
+
+// ============================================================
+// GET M1
+// ============================================================
+
+int MotorControlador::getM1()
+{
+
+    return ultimoM1;
+
+}
+
+
+
+// ============================================================
+// GET M2
+// ============================================================
+
+int MotorControlador::getM2()
+{
+
+    return ultimoM2;
+
+}
+
+
+
+// ============================================================
+// GET M3
+// ============================================================
+
+int MotorControlador::getM3()
+{
+
+    return ultimoM3;
+
+}
+
+
+
+// ============================================================
+// GET M4
+// ============================================================
+
+int MotorControlador::getM4()
+{
+
+    return ultimoM4;
+
+}
+
+
+
+// ============================================================
+// AVAILABLE
+// ============================================================
 
 bool MotorControlador::available()
 {
@@ -136,7 +316,9 @@ bool MotorControlador::available()
 
 
 
-
+// ============================================================
+// READ DATA
+// ============================================================
 
 String MotorControlador::readData()
 {

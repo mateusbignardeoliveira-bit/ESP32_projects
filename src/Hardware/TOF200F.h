@@ -2,11 +2,9 @@
 #define TOF200F_H
 
 #include <Arduino.h>
+#include <Adafruit_VL53L0X.h>
 
 #include "TCA.h"
-
-#include "Adafruit_VL53L0X.h"
-
 
 
 class TOF200F
@@ -16,59 +14,55 @@ private:
 
     TCA& tca;
 
+    Adafruit_VL53L0X lox;
+
 
     uint8_t canal;
 
 
-    Adafruit_VL53L0X lox;
+    // --------------------------------------------------------
+    // Filtro
+    // --------------------------------------------------------
 
-
-
-    // Calibração
-    const int OFFSET_CORRECAO_MM = -20;
-
-
-
-    // Filtro média móvel
-    static const int NUM_LEITURAS = 10;
+    static const int NUM_LEITURAS = 3;
 
     int leituras[NUM_LEITURAS];
 
     int indiceLeitura;
 
-    long totalSoma;
+    int totalSoma;
 
 
+    // --------------------------------------------------------
+    // Última distância válida
+    // --------------------------------------------------------
 
     int distanciaAtual;
 
 
+    // --------------------------------------------------------
+    // Correção de calibração
+    // --------------------------------------------------------
+
+    static constexpr int OFFSET_CORRECAO_MM = -20;
+
 
 public:
 
-
-    // Recebe o TCA que controla o sensor
     TOF200F(TCA& multiplexador);
 
 
-
-    // Inicializa o sensor
+    // Inicializa o sensor no canal indicado do TCA
     bool begin(uint8_t canalTCA);
-
 
 
     // Atualiza a leitura
     void update();
 
 
-
     // Retorna distância filtrada em mm
     int getDistance();
 
-
-
 };
-
-
 
 #endif

@@ -2,17 +2,11 @@
 
 #include "hardware/ArrayLinha.h"
 #include "sensores/LinhaAnalise.h"
+#include "controle/ControleSegueLinha.h"
 
 
 // ============================================================
-// ARRAY
-//
-// RX = 5
-// TX = 18
-//
-// DIGITAL:
-// 0 = PRETO
-// 1 = BRANCO
+// ARRAY DE LINHA
 // ============================================================
 
 ArrayLinha arrayLinha(
@@ -30,12 +24,21 @@ LinhaAnalise linhaAnalise;
 
 
 // ============================================================
+// CONTROLADOR
+// ============================================================
+
+ControleSegueLinha controle;
+
+
+// ============================================================
 // DADOS
 // ============================================================
 
 ArrayData dados;
 
 LinhaData linha;
+
+ControleData controleData;
 
 
 // ============================================================
@@ -61,19 +64,52 @@ void setup()
 
     Serial.println();
     Serial.println("========================================");
-    Serial.println("       TESTE LINHA ANALISE");
+    Serial.println("       TESTE CONTROLADOR");
     Serial.println("========================================");
 
     Serial.println();
 
-    Serial.println("Digital:");
-    Serial.println("0 = PRETO");
-    Serial.println("1 = BRANCO");
 
-    Serial.println();
-
+    // --------------------------------------------------------
+    // Inicializa array
+    // --------------------------------------------------------
 
     arrayLinha.begin();
+
+
+    // --------------------------------------------------------
+    // PID inicial
+    //
+    // Valores provisórios.
+    // Ainda vamos ajustar.
+    // --------------------------------------------------------
+
+    controle.configurarPID(
+        100.0f,
+        0.0f,
+        15.0f
+    );
+
+
+    // --------------------------------------------------------
+    // Velocidade
+    //
+    // Ainda não será enviada aos motores.
+    // --------------------------------------------------------
+
+    controle.configurarVelocidade(
+        1000,
+        3000
+    );
+
+    controle.configurarVelocidadeAdaptativa(
+        1.0f,
+        6.0f,
+        500
+    );
+
+
+    controle.reset();
 
 }
 
@@ -101,10 +137,12 @@ void loop()
 
 
     // ========================================================
-    // ANALISA
+    // ANALISA LINHA
     // ========================================================
 
-    linhaAnalise.update(dados);
+    linhaAnalise.update(
+        dados
+    );
 
 
     linha =
@@ -112,95 +150,41 @@ void loop()
 
 
     // ========================================================
-    // IMPRIME
+    // CONTROLADOR
     // ========================================================
 
-    unsigned long agora = millis();
+    controle.update(
+        linha
+    );
 
 
-    if(agora - ultimoPrint >= INTERVALO_PRINT)
+    controleData =
+        controle.getData();
+
+
+    // ========================================================
+    // MONITOR SERIAL
+    // ========================================================
+
+    unsigned long agora =
+        millis();
+
+
+    if(
+        agora - ultimoPrint >=
+        INTERVALO_PRINT
+    )
     {
 
-        ultimoPrint = agora;
+        ultimoPrint =
+            agora;
 
 
         // ----------------------------------------------------
-        // ANALÓGICO
+        // LINHA
         // ----------------------------------------------------
 
-        Serial.print("A: ");
-
-        Serial.print(dados.s1);
-        Serial.print(" ");
-
-        Serial.print(dados.s2);
-        Serial.print(" ");
-
-        Serial.print(dados.s3);
-        Serial.print(" ");
-
-        Serial.print(dados.s4);
-        Serial.print(" ");
-
-        Serial.print(dados.s5);
-        Serial.print(" ");
-
-        Serial.print(dados.s6);
-        Serial.print(" ");
-
-        Serial.print(dados.s7);
-        Serial.print(" ");
-
-        Serial.print(dados.s8);
-
-
-        // ----------------------------------------------------
-        // DIGITAL
-        // ----------------------------------------------------
-
-        Serial.print("    D: ");
-
-        Serial.print(dados.d1);
-        Serial.print(" ");
-
-        Serial.print(dados.d2);
-        Serial.print(" ");
-
-        Serial.print(dados.d3);
-        Serial.print(" ");
-
-        Serial.print(dados.d4);
-        Serial.print(" ");
-
-        Serial.print(dados.d5);
-        Serial.print(" ");
-
-        Serial.print(dados.d6);
-        Serial.print(" ");
-
-        Serial.print(dados.d7);
-        Serial.print(" ");
-
-        Serial.print(dados.d8);
-
-
-        // ----------------------------------------------------
-        // POSIÇÃO
-        // ----------------------------------------------------
-
-        Serial.print("    POS: ");
-
-        Serial.print(
-            linha.posicao,
-            2
-        );
-
-
-        // ----------------------------------------------------
-        // ERRO
-        // ----------------------------------------------------
-
-        Serial.print("    ERRO: ");
+        Serial.print("ERRO: ");
 
         Serial.print(
             linha.erro,
@@ -209,30 +193,65 @@ void loop()
 
 
         // ----------------------------------------------------
-        // INTENSIDADE
+        // PID
         // ----------------------------------------------------
 
-        Serial.print("    INT: ");
+        Serial.print("    P: ");
 
         Serial.print(
-            linha.intensidade,
+            controleData.proporcional,
+            2
+        );
+
+
+        Serial.print("    I: ");
+
+        Serial.print(
+            controleData.integral,
+            2
+        );
+
+
+        Serial.print("    D: ");
+
+        Serial.print(
+            controleData.derivativo,
             2
         );
 
 
         // ----------------------------------------------------
-        // LARGURA
+        // CORREÇÃO
         // ----------------------------------------------------
 
-        Serial.print("    LARG: ");
+        Serial.print("    COR: ");
 
         Serial.print(
-            linha.largura
+            controleData.correcao,
+            2
         );
 
 
         // ----------------------------------------------------
-        // SENSORES PRETOS
+        // MOTORES
+        // ----------------------------------------------------
+
+        Serial.print("    ESQ: ");
+
+        Serial.print(
+            controleData.velocidadeEsquerda
+        );
+
+
+        Serial.print("    DIR: ");
+
+        Serial.print(
+            controleData.velocidadeDireita
+        );
+
+
+        // ----------------------------------------------------
+        // SITUAÇÃO
         // ----------------------------------------------------
 
         Serial.print("    PRETOS: ");
@@ -241,43 +260,15 @@ void loop()
             linha.sensoresPretos
         );
 
-
-        // ----------------------------------------------------
-        // POSIÇÃO DIGITAL
         // ----------------------------------------------------
 
-        Serial.print("    POS_D: ");
+        Serial.print("    BASE: ");
 
         Serial.print(
-            linha.posicaoDigital,
-            2
-        );
+         controleData.velocidadeBaseAtual
+         );
 
-
-        // ----------------------------------------------------
-        // SITUAÇÃO
-        // ----------------------------------------------------
-
-        Serial.print("    SIT: ");
-
-
-        if(linha.situacao == LINHA_NORMAL)
-        {
-            Serial.print("NORMAL");
-        }
-
-        else if(linha.situacao == LINHA_DESALINHADA)
-        {
-            Serial.print("DESALINHADA");
-        }
-
-        else if(linha.situacao == LINHA_EVENTO)
-        {
-            Serial.print("EVENTO");
-        }
-
-
-        Serial.println();
+        Serial.println();  
 
     }
 
