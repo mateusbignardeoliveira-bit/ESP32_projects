@@ -8,27 +8,40 @@
 ControleSegueLinha::ControleSegueLinha()
 {
 
+    // ========================================================
+    // PID
+    // ========================================================
+
     Kp = 0.0f;
+
     Ki = 0.0f;
+
     Kd = 0.0f;
 
+
+    // ========================================================
+    // MEMÓRIA
+    // ========================================================
 
     erroAnterior = 0.0f;
 
     integral = 0.0f;
 
-
     tempoAnterior = millis();
 
+
+    // ========================================================
+    // VELOCIDADES
+    // ========================================================
 
     velocidadeBase = 0;
 
     velocidadeMaxima = 0;
 
 
-    // --------------------------------------------------------
-    // Configuração padrão da velocidade adaptativa
-    // --------------------------------------------------------
+    // ========================================================
+    // VELOCIDADE ADAPTATIVA
+    // ========================================================
 
     erroVelocidadeMinimo = 1.0f;
 
@@ -37,9 +50,9 @@ ControleSegueLinha::ControleSegueLinha()
     velocidadeMinimaCurva = 500;
 
 
-    // --------------------------------------------------------
-    // Resultado
-    // --------------------------------------------------------
+    // ========================================================
+    // RESULTADO
+    // ========================================================
 
     resultado.proporcional = 0.0f;
 
@@ -59,7 +72,111 @@ ControleSegueLinha::ControleSegueLinha()
 
 
 // ============================================================
-// CONFIGURA PID
+// LIMITAR VALOR
+// ============================================================
+
+float ControleSegueLinha::limitar(
+    float valor,
+    float minimo,
+    float maximo
+)
+{
+
+    if(valor < minimo)
+    {
+        return minimo;
+    }
+
+
+    if(valor > maximo)
+    {
+        return maximo;
+    }
+
+
+    return valor;
+
+}
+
+
+// ============================================================
+// CALCULAR VELOCIDADE BASE
+// ============================================================
+
+int ControleSegueLinha::calcularVelocidadeBase(
+    float erro
+)
+{
+
+    float magnitude =
+        fabsf(erro);
+
+
+    // ========================================================
+    // ROBÔ PRATICAMENTE CENTRALIZADO
+    // ========================================================
+
+    if(
+        magnitude <=
+        erroVelocidadeMinimo
+    )
+    {
+
+        return velocidadeBase;
+
+    }
+
+
+    // ========================================================
+    // ERRO MUITO GRANDE
+    // ========================================================
+
+    if(
+        magnitude >=
+        erroVelocidadeMaximo
+    )
+    {
+
+        return velocidadeMinimaCurva;
+
+    }
+
+
+    // ========================================================
+    // INTERPOLAÇÃO
+    // ========================================================
+
+    float proporcao =
+        (
+            magnitude -
+            erroVelocidadeMinimo
+        )
+        /
+        (
+            erroVelocidadeMaximo -
+            erroVelocidadeMinimo
+        );
+
+
+    float velocidade =
+        velocidadeBase
+        -
+        (
+            proporcao *
+            (
+                velocidadeBase -
+                velocidadeMinimaCurva
+            )
+        );
+
+
+    return (int)velocidade;
+
+}
+
+
+// ============================================================
+// CONFIGURAR PID
 // ============================================================
 
 void ControleSegueLinha::configurarPID(
@@ -79,7 +196,7 @@ void ControleSegueLinha::configurarPID(
 
 
 // ============================================================
-// CONFIGURA VELOCIDADE
+// CONFIGURAR VELOCIDADE
 // ============================================================
 
 void ControleSegueLinha::configurarVelocidade(
@@ -88,17 +205,15 @@ void ControleSegueLinha::configurarVelocidade(
 )
 {
 
-    velocidadeBase =
-        base;
+    velocidadeBase = base;
 
-    velocidadeMaxima =
-        maxima;
+    velocidadeMaxima = maxima;
 
 }
 
 
 // ============================================================
-// CONFIGURA VELOCIDADE ADAPTATIVA
+// CONFIGURAR VELOCIDADE ADAPTATIVA
 // ============================================================
 
 void ControleSegueLinha::configurarVelocidadeAdaptativa(
@@ -118,86 +233,6 @@ void ControleSegueLinha::configurarVelocidadeAdaptativa(
 
     velocidadeMinimaCurva =
         velocidadeMinima;
-
-}
-
-
-// ============================================================
-// CALCULA VELOCIDADE BASE
-// ============================================================
-
-int ControleSegueLinha::calcularVelocidadeBase(
-    float erro
-)
-{
-
-    float magnitude =
-        fabs(erro);
-
-
-    // --------------------------------------------------------
-    // Erro pequeno
-    //
-    // Mantém velocidade máxima
-    // --------------------------------------------------------
-
-    if(
-        magnitude <=
-        erroVelocidadeMinimo
-    )
-    {
-
-        return velocidadeBase;
-
-    }
-
-
-    // --------------------------------------------------------
-    // Erro muito grande
-    //
-    // Usa velocidade mínima
-    // --------------------------------------------------------
-
-    if(
-        magnitude >=
-        erroVelocidadeMaximo
-    )
-    {
-
-        return velocidadeMinimaCurva;
-
-    }
-
-
-    // --------------------------------------------------------
-    // Entre os dois limites
-    //
-    // Interpolação linear
-    // --------------------------------------------------------
-
-    float proporcao =
-        (magnitude - erroVelocidadeMinimo)
-        /
-        (erroVelocidadeMaximo - erroVelocidadeMinimo);
-
-
-    int velocidade =
-        velocidadeBase
-        -
-        (
-            int
-            (
-                proporcao *
-                (
-                    velocidadeBase
-                    -
-                    velocidadeMinimaCurva
-                )
-            )
-        );
-
-
-    return velocidade;
 
 }
 
@@ -224,6 +259,13 @@ void ControleSegueLinha::reset()
 
     resultado.correcao = 0.0f;
 
+    resultado.velocidadeBaseAtual =
+        velocidadeBase;
+
+    resultado.velocidadeEsquerda = 0;
+
+    resultado.velocidadeDireita = 0;
+
 }
 
 
@@ -236,26 +278,47 @@ void ControleSegueLinha::update(
 )
 {
 
+    // ========================================================
+    // TEMPO
+    // ========================================================
+
     unsigned long agora =
         millis();
 
 
     float dt =
-        (agora - tempoAnterior)
-        / 1000.0f;
+        (
+            float
+            (
+                agora -
+                tempoAnterior
+            )
+        )
+        /
+        1000.0f;
 
 
     tempoAnterior =
         agora;
 
 
-    // --------------------------------------------------------
-    // Proteção
-    // --------------------------------------------------------
+    // ========================================================
+    // PROTEÇÃO CONTRA DT MUITO PEQUENO
+    // ========================================================
 
-    if(dt <= 0.0f)
+    if(dt < 0.001f)
     {
         dt = 0.001f;
+    }
+
+
+    // ========================================================
+    // PROTEÇÃO CONTRA PAUSA MUITO GRANDE
+    // ========================================================
+
+    if(dt > 0.100f)
+    {
+        dt = 0.100f;
     }
 
 
@@ -268,7 +331,7 @@ void ControleSegueLinha::update(
 
 
     // ========================================================
-    // PROPORCIONAL
+    // TERMO PROPORCIONAL
     // ========================================================
 
     float proporcional =
@@ -276,7 +339,7 @@ void ControleSegueLinha::update(
 
 
     // ========================================================
-    // INTEGRAL
+    // TERMO INTEGRAL
     // ========================================================
 
     if(Ki != 0.0f)
@@ -286,16 +349,16 @@ void ControleSegueLinha::update(
             erro * dt;
 
 
-        if(integral > 100.0f)
-        {
-            integral = 100.0f;
-        }
+        // ----------------------------------------------------
+        // ANTI-WINDUP
+        // ----------------------------------------------------
 
-
-        if(integral < -100.0f)
-        {
-            integral = -100.0f;
-        }
+        integral =
+            limitar(
+                integral,
+                -50.0f,
+                50.0f
+            );
 
     }
     else
@@ -307,12 +370,16 @@ void ControleSegueLinha::update(
 
 
     // ========================================================
-    // DERIVATIVO
+    // TERMO DERIVATIVO
     // ========================================================
 
     float derivativo =
-        (erro - erroAnterior)
-        / dt;
+        (
+            erro -
+            erroAnterior
+        )
+        /
+        dt;
 
 
     erroAnterior =
@@ -320,24 +387,15 @@ void ControleSegueLinha::update(
 
 
     // --------------------------------------------------------
-    // Limita derivativo
+    // LIMITAÇÃO DO DERIVATIVO
     // --------------------------------------------------------
 
-    const float LIMITE_DERIVATIVO = 20.0f;
-
-
-    if(derivativo > LIMITE_DERIVATIVO)
-    {
-        derivativo =
-            LIMITE_DERIVATIVO;
-    }
-
-
-    if(derivativo < -LIMITE_DERIVATIVO)
-    {
-        derivativo =
-            -LIMITE_DERIVATIVO;
-    }
+    derivativo =
+        limitar(
+            derivativo,
+            -20.0f,
+            20.0f
+        );
 
 
     // ========================================================
@@ -345,15 +403,24 @@ void ControleSegueLinha::update(
     // ========================================================
 
     float correcao =
-        (Kp * proporcional)
+        (
+            Kp *
+            proporcional
+        )
         +
-        (Ki * integral)
+        (
+            Ki *
+            integral
+        )
         +
-        (Kd * derivativo);
+        (
+            Kd *
+            derivativo
+        );
 
 
     // ========================================================
-    // VELOCIDADE ADAPTATIVA
+    // VELOCIDADE BASE ADAPTATIVA
     // ========================================================
 
     int baseAtual =
@@ -361,111 +428,106 @@ void ControleSegueLinha::update(
             erro
         );
 
-// LIMITE DA CORREÇÃO
-//
-// No segue-linha normal não permitimos que um lado
-// fique negativo.
-//
-// Giro no próprio eixo será responsabilidade dos
-// estados especiais de curva.
-// ========================================================
 
-float limiteCorrecao =
-    (float)baseAtual * 0.90f;
+    // ========================================================
+    // LIMITE DA CORREÇÃO
+    // ========================================================
+
+    float limiteCorrecao =
+        baseAtual * 0.90f;
 
 
-// Limite absoluto
+    if(
+        limiteCorrecao >
+        velocidadeMaxima
+    )
+    {
 
-if(limiteCorrecao > velocidadeMaxima)
-{
-    limiteCorrecao =
-        velocidadeMaxima;
-}
+        limiteCorrecao =
+            velocidadeMaxima;
 
-
-if(correcao > limiteCorrecao)
-{
-    correcao =
-        limiteCorrecao;
-}
+    }
 
 
-if(correcao < -limiteCorrecao)
-{
-    correcao =
-        -limiteCorrecao;
-}
+    if(limiteCorrecao < 0.0f)
+    {
+        limiteCorrecao = 0.0f;
+    }
 
 
     // ========================================================
-    // MOTORES
+    // LIMITA CORREÇÃO
+    // ========================================================
+
+    correcao =
+        limitar(
+            correcao,
+            -limiteCorrecao,
+            limiteCorrecao
+        );
+
+
+    // ========================================================
+    // CALCULA MOTORES
     // ========================================================
 
     int esquerda =
-        baseAtual
-        +
+        baseAtual +
         (int)correcao;
 
 
     int direita =
-        baseAtual
-        -
+        baseAtual -
         (int)correcao;
 
 
     // ========================================================
-    // LIMITES
+    // LIMITES FINAIS
     // ========================================================
 
-    if(esquerda > velocidadeMaxima)
-    {
-        esquerda =
-            velocidadeMaxima;
-    }
+    esquerda =
+        constrain(
+            esquerda,
+            -velocidadeMaxima,
+            velocidadeMaxima
+        );
 
 
-    if(esquerda < -velocidadeMaxima)
-    {
-        esquerda =
-            -velocidadeMaxima;
-    }
-
-
-    if(direita > velocidadeMaxima)
-    {
-        direita =
-            velocidadeMaxima;
-    }
-
-
-    if(direita < -velocidadeMaxima)
-    {
-        direita =
-            -velocidadeMaxima;
-    }
+    direita =
+        constrain(
+            direita,
+            -velocidadeMaxima,
+            velocidadeMaxima
+        );
 
 
     // ========================================================
-    // RESULTADO
+    // ARMAZENA RESULTADO
     // ========================================================
 
     resultado.proporcional =
         proporcional;
 
+
     resultado.integral =
         integral;
+
 
     resultado.derivativo =
         derivativo;
 
+
     resultado.correcao =
         correcao;
+
 
     resultado.velocidadeBaseAtual =
         baseAtual;
 
+
     resultado.velocidadeEsquerda =
         esquerda;
+
 
     resultado.velocidadeDireita =
         direita;
