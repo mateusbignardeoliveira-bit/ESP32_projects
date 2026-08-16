@@ -37,11 +37,11 @@ public:
 
 
     // Indica se a leitura é válida
-    bool isValido();
+    bool isValido() const;
 
 
     // Indica se existe obstáculo
-    bool temObstaculo();
+    bool temObstaculo() const;
 
 
     // Retorna o limite configurado

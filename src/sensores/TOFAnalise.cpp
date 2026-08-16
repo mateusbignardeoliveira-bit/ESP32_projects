@@ -84,7 +84,7 @@ int TOFAnalise::getDistancia()
 // LEITURA VÁLIDA
 // ============================================================
 
-bool TOFAnalise::isValido()
+bool TOFAnalise::isValido() const
 {
 
     return valido;
@@ -96,7 +96,7 @@ bool TOFAnalise::isValido()
 // OBSTÁCULO
 // ============================================================
 
-bool TOFAnalise::temObstaculo()
+bool TOFAnalise::temObstaculo() const
 {
 
     return obstaculo;
