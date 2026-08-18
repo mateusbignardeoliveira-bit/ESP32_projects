@@ -1,33 +1,102 @@
 #include <Arduino.h>
-#include <Wire.h>
 
-#include "hardware/TCA.h"
-#include "hardware/AS7341.h"
-
-
-// ============================================================
-// PINOS I2C
-// ============================================================
-
-#define I2C_SDA 21
-#define I2C_SCL 22
-
+#include "Hardware/TCA.h"
+#include "Hardware/AS7341.h"
+#include "sensores/AS7341Analise.h"
 
 // ============================================================
-// TCA9548A
+// OBJETOS
 // ============================================================
 
-#define TCA_ENDERECO 0x70
+TCA tca;
 
-TCA tca(TCA_ENDERECO);
+AS7341Sensores sensoresAS7341(tca);
 
+AS7341Analise analise;
 
 // ============================================================
-// AS7341
+// IMPRIMIR RESULTADO
 // ============================================================
 
-AS7341Sensores espectro(tca);
+void imprimirResultado(
+    const char* nome,
+    const AS7341Resultado& resultado
+)
+{
+    Serial.println();
+    Serial.println("----------------------------------------");
+    Serial.print(nome);
+    Serial.println();
+    Serial.println("----------------------------------------");
 
+    if(!resultado.valido)
+    {
+        Serial.println("Sensor INVALIDO");
+        return;
+    }
+
+    Serial.print("Intensidade: ");
+    Serial.println(resultado.intensidade);
+
+    Serial.print("Azul:        ");
+    Serial.println(resultado.azul);
+
+    Serial.print("Verde:       ");
+    Serial.println(resultado.verde);
+
+    Serial.print("Vermelho:    ");
+    Serial.println(resultado.vermelho);
+
+    Serial.print("Vermelho/Verde: ");
+    Serial.println(
+        resultado.razaoVermelhoVerde,
+        3
+    );
+
+    Serial.print("Azul/Verde:     ");
+    Serial.println(
+        resultado.razaoAzulVerde,
+        3
+    );
+
+    Serial.print("NIR/Clear:      ");
+    Serial.println(
+        resultado.razaoNIR,
+        3
+    );
+
+    Serial.print("Canal dominante: ");
+
+    switch(resultado.canalDominante)
+    {
+        case 1:
+            Serial.println("AZUL");
+            break;
+
+        case 2:
+            Serial.println("VERDE");
+            break;
+
+        case 3:
+            Serial.println("VERMELHO");
+            break;
+
+        default:
+            Serial.println("INVALIDO");
+            break;
+    }
+
+    Serial.print("VERDE DETECTADO: ");
+
+    if(resultado.verdeDetectado)
+    {
+        Serial.println("SIM");
+    }
+    else
+    {
+        Serial.println("NAO");
+    }
+}
 
 // ============================================================
 // SETUP
@@ -35,35 +104,24 @@ AS7341Sensores espectro(tca);
 
 void setup()
 {
-
     Serial.begin(115200);
 
     delay(1000);
 
-
     Serial.println();
-    Serial.println("================================");
-    Serial.println(" TESTE DOS SENSORES AS7341");
-    Serial.println("================================");
-    Serial.println();
-
+    Serial.println("========================================");
+    Serial.println(" TESTE / CALIBRACAO AS7341");
+    Serial.println("========================================");
 
     // --------------------------------------------------------
-    // I2C
+    // I2C / TCA
     // --------------------------------------------------------
 
-    Wire.begin(
-        I2C_SDA,
-        I2C_SCL
-    );
-
-
-    // --------------------------------------------------------
-    // TCA
-    // --------------------------------------------------------
+    Serial.println("Inicializando TCA...");
 
     tca.begin();
 
+    Serial.println("TCA inicializado.");
 
     // --------------------------------------------------------
     // AS7341
@@ -71,30 +129,25 @@ void setup()
 
     Serial.println("Inicializando AS7341...");
 
-
-    if(!espectro.begin())
+    if(!sensoresAS7341.begin())
     {
-
-        Serial.println(
-            "ERRO: Falha ao inicializar os AS7341!"
-        );
+        Serial.println();
+        Serial.println("ERRO ao inicializar AS7341!");
+        Serial.println("Verifique TCA, alimentacao e I2C.");
 
         while(true)
         {
             delay(1000);
         }
-
     }
 
-
-    Serial.println(
-        "AS7341 inicializados com sucesso!"
-    );
+    Serial.println("AS7341 inicializados.");
 
     Serial.println();
-
+    Serial.println("Coloque os sensores sobre as superficies");
+    Serial.println("que queremos testar.");
+    Serial.println();
 }
-
 
 // ============================================================
 // LOOP
@@ -102,139 +155,65 @@ void setup()
 
 void loop()
 {
-
     // --------------------------------------------------------
-    // Atualiza os dois sensores
+    // Nova leitura
     // --------------------------------------------------------
 
-    if(!espectro.update())
+    if(!sensoresAS7341.update())
     {
-
-        Serial.println(
-            "ERRO: Falha durante leitura dos AS7341!"
-        );
+        Serial.println("ERRO na leitura dos AS7341.");
 
         delay(500);
 
         return;
-
     }
 
-
     // --------------------------------------------------------
-    // Obtém dados da direita
-    // --------------------------------------------------------
-
-    AS7341Data direita =
-        espectro.getDireita();
-
-
-    // --------------------------------------------------------
-    // Obtém dados da esquerda
+    // Obtém dados brutos
     // --------------------------------------------------------
 
-    AS7341Data esquerda =
-        espectro.getEsquerda();
+    AS7341Data dadosDireita =
+        sensoresAS7341.getDireita();
 
+    AS7341Data dadosEsquerda =
+        sensoresAS7341.getEsquerda();
 
-    // ========================================================
-    // SENSOR DIREITA
-    // ========================================================
+    // --------------------------------------------------------
+    // Analisa
+    // --------------------------------------------------------
 
-    Serial.println("----------- DIREITA -----------");
+    AS7341Resultado resultadoDireita =
+        analise.analisar(
+            dadosDireita
+        );
 
-    Serial.print("F1: ");
-    Serial.println(direita.F1);
+    AS7341Resultado resultadoEsquerda =
+        analise.analisar(
+            dadosEsquerda
+        );
 
-    Serial.print("F2: ");
-    Serial.println(direita.F2);
-
-    Serial.print("F3: ");
-    Serial.println(direita.F3);
-
-    Serial.print("F4: ");
-    Serial.println(direita.F4);
-
-    Serial.print("F5: ");
-    Serial.println(direita.F5);
-
-    Serial.print("F6: ");
-    Serial.println(direita.F6);
-
-    Serial.print("F7: ");
-    Serial.println(direita.F7);
-
-    Serial.print("F8: ");
-    Serial.println(direita.F8);
-
-    Serial.print("Clear: ");
-    Serial.println(direita.clear);
-
-    Serial.print("NIR: ");
-    Serial.println(direita.nir);
-
-
-    // ========================================================
-    // SENSOR ESQUERDA
-    // ========================================================
+    // --------------------------------------------------------
+    // Imprime
+    // --------------------------------------------------------
 
     Serial.println();
-
-    Serial.println("----------- ESQUERDA -----------");
-
-    Serial.print("F1: ");
-    Serial.println(esquerda.F1);
-
-    Serial.print("F2: ");
-    Serial.println(esquerda.F2);
-
-    Serial.print("F3: ");
-    Serial.println(esquerda.F3);
-
-    Serial.print("F4: ");
-    Serial.println(esquerda.F4);
-
-    Serial.print("F5: ");
-    Serial.println(esquerda.F5);
-
-    Serial.print("F6: ");
-    Serial.println(esquerda.F6);
-
-    Serial.print("F7: ");
-    Serial.println(esquerda.F7);
-
-    Serial.print("F8: ");
-    Serial.println(esquerda.F8);
-
-    Serial.print("Clear: ");
-    Serial.println(esquerda.clear);
-
-    Serial.print("NIR: ");
-    Serial.println(esquerda.nir);
-
-
-    // ========================================================
-    // VALIDADE
-    // ========================================================
-
     Serial.println();
+    Serial.println("========================================");
+    Serial.println(" NOVA LEITURA");
+    Serial.println("========================================");
 
-    Serial.print("Direita valida: ");
-    Serial.println(
-        direita.valido ? "SIM" : "NAO"
+    imprimirResultado(
+        "SENSOR DIREITA",
+        resultadoDireita
     );
 
-    Serial.print("Esquerda valida: ");
-    Serial.println(
-        esquerda.valido ? "SIM" : "NAO"
+    imprimirResultado(
+        "SENSOR ESQUERDA",
+        resultadoEsquerda
     );
 
-
     Serial.println();
-    Serial.println("===============================");
-    Serial.println();
+    Serial.println("========================================");
 
-
-    delay(500);
-
+    delay(300);
 }
