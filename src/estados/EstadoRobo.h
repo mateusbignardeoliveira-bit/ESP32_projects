@@ -5,7 +5,7 @@
 
 #include "../sensores/LinhaAnalise.h"
 #include "../sensores/TOFAnalise.h"
-
+#include "../decisao/DecisaoRobo.h"
 
 // ============================================================
 // ESTADOS DO ROBÔ
@@ -16,7 +16,14 @@ enum EstadoRobo
     ESTADO_SEGUINDO_LINHA,
 
     ESTADO_CURVA_ESQUERDA,
+
     ESTADO_CURVA_DIREITA,
+
+    ESTADO_INTERSECCAO,
+
+    ESTADO_PASSAGEM_RETA,
+
+    ESTADO_MEIA_VOLTA,
 
     ESTADO_DESALINHADO,
 
@@ -25,28 +32,21 @@ enum EstadoRobo
     ESTADO_RECUPERACAO
 };
 
-
 // ============================================================
 // CLASSE
 // ============================================================
 
 class EstadoRoboControl
 {
-
 private:
 
     EstadoRobo estadoAtual;
 
     // --------------------------------------------------------
-    // Memória do último lado conhecido da linha
+    // Memória do último lado conhecido
     // --------------------------------------------------------
 
     int ultimoLado;
-
-    // -1 = esquerda
-    //  0 = centro
-    // +1 = direita
-
 
     // --------------------------------------------------------
     // Tempo sem detectar linha
@@ -54,9 +54,8 @@ private:
 
     unsigned long inicioPerdaLinha;
 
-
     // --------------------------------------------------------
-    // Parâmetros de decisão
+    // Parâmetros antigos mantidos por compatibilidade
     // --------------------------------------------------------
 
     static constexpr float LIMITE_CURVA =
@@ -68,24 +67,21 @@ private:
     static constexpr unsigned long TEMPO_RECUPERACAO =
         300;
 
-
     // --------------------------------------------------------
-    // Determina o lado da linha
+    // Determina lado da linha
     // --------------------------------------------------------
 
     int determinarLado(
         const LinhaData& linha
     );
 
-
     // --------------------------------------------------------
-    // Atualiza memória de lado
+    // Atualiza memória da linha
     // --------------------------------------------------------
 
     void atualizarMemoriaLinha(
         const LinhaData& linha
     );
-
 
 public:
 
@@ -95,9 +91,20 @@ public:
 
     EstadoRoboControl();
 
+    // ========================================================
+    // UPDATE PRINCIPAL
+    //
+    // Recebe a decisão já processada.
+    // ========================================================
+
+    void update(
+        const DecisaoData& decisao
+    );
 
     // ========================================================
-    // ATUALIZA ESTADO
+    // UPDATE ANTIGO COM TOF
+    //
+    // Mantido para compatibilidade.
     // ========================================================
 
     void update(
@@ -105,13 +112,11 @@ public:
         const TOFAnalise& tof
     );
 
-
     // ========================================================
-    // RETORNA ESTADO
+    // GET
     // ========================================================
 
     EstadoRobo getEstado();
-
 
     // ========================================================
     // DEFINE MANUALMENTE
@@ -121,13 +126,11 @@ public:
         EstadoRobo novoEstado
     );
 
-
     // ========================================================
-    // TEXTO DO ESTADO
+    // NOME DO ESTADO
     // ========================================================
 
     const char* getNomeEstado();
-
 };
 
 #endif

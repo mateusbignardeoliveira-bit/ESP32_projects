@@ -8,6 +8,7 @@
 #include "sensores/LinhaAnalise.h"
 
 #include "decisao/DecisaoRobo.h"
+#include "estados/EstadoRobo.h"
 
 // ============================================================
 // OBJETOS
@@ -29,6 +30,8 @@ AS7341Analise as7341Analise;
 LinhaAnalise linhaAnalise;
 
 DecisaoRobo decisaoRobo;
+
+EstadoRoboControl estadoRobo;
 
 // ============================================================
 // NOME DA DECISÃO DO VERDE
@@ -99,7 +102,7 @@ void setup()
 
     Serial.println();
     Serial.println("========================================");
-    Serial.println(" TESTE DECISAO ROBO");
+    Serial.println(" TESTE DECISAO + ESTADOS");
     Serial.println(" AS7341 + ARRAY");
     Serial.println("========================================");
 
@@ -218,6 +221,14 @@ void loop()
     const DecisaoData& decisao =
         decisaoRobo.getData();
 
+    // --------------------------------------------------------
+    // ESTADO
+    // --------------------------------------------------------
+
+    estadoRobo.update(
+        decisao
+    );
+
     // ========================================================
     // SERIAL
     // ========================================================
@@ -303,6 +314,16 @@ void loop()
     {
         Serial.println("NAO");
     }
+
+    // --------------------------------------------------------
+    // ESTADO DO ROBÔ
+    // --------------------------------------------------------
+
+    Serial.print("Estado robo: ");
+
+    Serial.println(
+        estadoRobo.getNomeEstado()
+    );
 
     Serial.println("========================================");
 

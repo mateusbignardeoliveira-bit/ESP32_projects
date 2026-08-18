@@ -3,6 +3,7 @@
 
 #include "../sensores/AS7341Analise.h"
 #include "../sensores/LinhaAnalise.h"
+#include "../sensores/TOFAnalise.h"
 
 // ============================================================
 // AÇÕES RELACIONADAS AO VERDE
@@ -11,13 +12,9 @@
 enum TipoAcaoVerde
 {
     VERDE_SEM_EVENTO,
-
     VERDE_PASSAGEM_RETA,
-
     VERDE_CURVA_ESQUERDA,
-
     VERDE_CURVA_DIREITA,
-
     VERDE_MEIA_VOLTA
 };
 
@@ -28,12 +25,19 @@ enum TipoAcaoVerde
 enum TipoEventoArray
 {
     ARRAY_NORMAL,
-
     ARRAY_CURVA_ESQUERDA,
-
     ARRAY_CURVA_DIREITA,
-
     ARRAY_INTERSECCAO
+};
+
+// ============================================================
+// EVENTOS DO TOF
+// ============================================================
+
+enum TipoEventoToF
+{
+    TOF_NORMAL,
+    TOF_OBSTACULO
 };
 
 // ============================================================
@@ -42,6 +46,16 @@ enum TipoEventoArray
 
 struct DecisaoData
 {
+    // --------------------------------------------------------
+    // TOF
+    // --------------------------------------------------------
+
+    TipoEventoToF eventoToF;
+
+    bool obstaculoDetectado;
+
+    int distanciaToF;
+
     // --------------------------------------------------------
     // VERDE
     // --------------------------------------------------------
@@ -65,7 +79,7 @@ struct DecisaoData
     float posicaoDigital;
 
     // --------------------------------------------------------
-    // Existe algum evento especial?
+    // Evento especial
     // --------------------------------------------------------
 
     bool eventoEspecial;
@@ -82,7 +96,7 @@ private:
     DecisaoData resultado;
 
     // --------------------------------------------------------
-    // Analisa somente os eventos do array
+    // Analisa array
     // --------------------------------------------------------
 
     TipoEventoArray analisarArray(
@@ -91,21 +105,32 @@ private:
 
 public:
 
+    // ========================================================
+    // CONSTRUTOR
+    // ========================================================
+
     DecisaoRobo();
 
-    // --------------------------------------------------------
-    // Atualiza decisão
-    // --------------------------------------------------------
+    // ========================================================
+    // UPDATE
+    //
+    // PRIORIDADE:
+    //
+    // 1. TOF
+    // 2. VERDE
+    // 3. ARRAY
+    // ========================================================
 
     void update(
         const AS7341Resultado& esquerda,
         const AS7341Resultado& direita,
-        const LinhaData& linha
+        const LinhaData& linha,
+        TOFAnalise& tof
     );
 
-    // --------------------------------------------------------
-    // Retorna decisão
-    // --------------------------------------------------------
+    // ========================================================
+    // GET DATA
+    // ========================================================
 
     const DecisaoData& getData() const;
 };
