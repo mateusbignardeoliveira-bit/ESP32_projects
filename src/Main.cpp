@@ -3,9 +3,11 @@
 #include "hardware/TCA.h"
 #include "hardware/AS7341.h"
 #include "hardware/ArrayLinha.h"
+#include "hardware/TOF200F.h"
 
 #include "sensores/AS7341Analise.h"
 #include "sensores/LinhaAnalise.h"
+#include "sensores/TOFAnalise.h"
 
 #include "decisao/DecisaoRobo.h"
 #include "estados/EstadoRobo.h"
@@ -17,6 +19,10 @@
 TCA tca;
 
 AS7341Sensores sensoresAS7341(tca);
+
+TOF200F tof200f(tca);
+
+TOFAnalise tofAnalise(tof200f);
 
 ArrayLinha arrayLinha(
     Serial2,
@@ -91,6 +97,27 @@ const char* nomeEventoArray(
 }
 
 // ============================================================
+// NOME DO EVENTO DO TOF
+// ============================================================
+
+const char* nomeEventoToF(
+    TipoEventoToF evento
+)
+{
+    switch(evento)
+    {
+        case TOF_NORMAL:
+            return "NORMAL";
+
+        case TOF_OBSTACULO:
+            return "OBSTACULO";
+
+        default:
+            return "DESCONHECIDO";
+    }
+}
+
+// ============================================================
 // SETUP
 // ============================================================
 
@@ -103,12 +130,12 @@ void setup()
     Serial.println();
     Serial.println("========================================");
     Serial.println(" TESTE DECISAO + ESTADOS");
-    Serial.println(" AS7341 + ARRAY");
+    Serial.println(" AS7341 + ARRAY + TOF");
     Serial.println("========================================");
 
-    // --------------------------------------------------------
+    // ========================================================
     // TCA
-    // --------------------------------------------------------
+    // ========================================================
 
     Serial.println("Inicializando TCA...");
 
@@ -116,9 +143,9 @@ void setup()
 
     Serial.println("TCA OK");
 
-    // --------------------------------------------------------
+    // ========================================================
     // AS7341
-    // --------------------------------------------------------
+    // ========================================================
 
     Serial.println("Inicializando AS7341...");
 
@@ -134,9 +161,28 @@ void setup()
 
     Serial.println("AS7341 OK");
 
-    // --------------------------------------------------------
+    // ========================================================
+    // TOF
+    // ========================================================
+
+    Serial.println("Inicializando TOF...");
+
+    // Canal 0 do TCA
+    if(!tof200f.begin(0))
+    {
+        Serial.println("ERRO TOF!");
+
+        while(true)
+        {
+            delay(1000);
+        }
+    }
+
+    Serial.println("TOF OK");
+
+    // ========================================================
     // ARRAY
-    // --------------------------------------------------------
+    // ========================================================
 
     Serial.println("Inicializando ArrayLinha...");
 
@@ -154,21 +200,29 @@ void setup()
 
 void loop()
 {
-    // --------------------------------------------------------
-    // Atualiza array
-    // --------------------------------------------------------
+    // ========================================================
+    // ATUALIZA TOF
+    // ========================================================
+
+    tof200f.update();
+
+    tofAnalise.update();
+
+    // ========================================================
+    // ATUALIZA ARRAY
+    // ========================================================
 
     arrayLinha.update();
 
-    // --------------------------------------------------------
-    // Atualiza AS7341
-    // --------------------------------------------------------
+    // ========================================================
+    // ATUALIZA AS7341
+    // ========================================================
 
     sensoresAS7341.update();
 
-    // --------------------------------------------------------
-    // Obtém dados brutos do AS7341
-    // --------------------------------------------------------
+    // ========================================================
+    // OBTÉM DADOS BRUTOS DO AS7341
+    // ========================================================
 
     AS7341Data dadosEsquerda =
         sensoresAS7341.getEsquerda();
@@ -176,16 +230,16 @@ void loop()
     AS7341Data dadosDireita =
         sensoresAS7341.getDireita();
 
-    // --------------------------------------------------------
-    // Obtém dados brutos do array
-    // --------------------------------------------------------
+    // ========================================================
+    // OBTÉM DADOS BRUTOS DO ARRAY
+    // ========================================================
 
     ArrayData dadosLinha =
         arrayLinha.getData();
 
-    // --------------------------------------------------------
-    // Analisa AS7341
-    // --------------------------------------------------------
+    // ========================================================
+    // ANALISA AS7341
+    // ========================================================
 
     AS7341Resultado esquerda =
         as7341Analise.analisar(
@@ -197,9 +251,9 @@ void loop()
             dadosDireita
         );
 
-    // --------------------------------------------------------
-    // Analisa linha
-    // --------------------------------------------------------
+    // ========================================================
+    // ANALISA LINHA
+    // ========================================================
 
     linhaAnalise.update(
         dadosLinha
@@ -208,22 +262,31 @@ void loop()
     LinhaData linha =
         linhaAnalise.getData();
 
-    // --------------------------------------------------------
+    // ========================================================
     // DECISÃO
-    // --------------------------------------------------------
+    //
+    // PRIORIDADE:
+    //
+    // TOF
+    //  ↓
+    // VERDE
+    //  ↓
+    // ARRAY
+    // ========================================================
 
     decisaoRobo.update(
         esquerda,
         direita,
-        linha
+        linha,
+        tofAnalise
     );
 
     const DecisaoData& decisao =
         decisaoRobo.getData();
 
-    // --------------------------------------------------------
+    // ========================================================
     // ESTADO
-    // --------------------------------------------------------
+    // ========================================================
 
     estadoRobo.update(
         decisao
@@ -237,6 +300,48 @@ void loop()
     Serial.println("========================================");
     Serial.println(" DECISAO ATUAL");
     Serial.println("========================================");
+
+    // --------------------------------------------------------
+    // TOF
+    // --------------------------------------------------------
+
+    Serial.print("Distancia ToF: ");
+
+    Serial.print(
+        decisao.distanciaToF
+    );
+
+    Serial.println(" mm");
+
+    Serial.print("ToF valido: ");
+
+    if(tofAnalise.isValido())
+    {
+        Serial.println("SIM");
+    }
+    else
+    {
+        Serial.println("NAO");
+    }
+
+    Serial.print("Evento ToF: ");
+
+    Serial.println(
+        nomeEventoToF(
+            decisao.eventoToF
+        )
+    );
+
+    Serial.print("Obstaculo: ");
+
+    if(decisao.obstaculoDetectado)
+    {
+        Serial.println("SIM");
+    }
+    else
+    {
+        Serial.println("NAO");
+    }
 
     // --------------------------------------------------------
     // AS7341

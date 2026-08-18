@@ -6,7 +6,7 @@
 #include "../sensores/TOFAnalise.h"
 
 // ============================================================
-// AÇÕES RELACIONADAS AO VERDE
+// AÇÕES DO VERDE
 // ============================================================
 
 enum TipoAcaoVerde
@@ -41,7 +41,7 @@ enum TipoEventoToF
 };
 
 // ============================================================
-// RESULTADO DA DECISÃO
+// DADOS DA DECISÃO
 // ============================================================
 
 struct DecisaoData
@@ -79,7 +79,7 @@ struct DecisaoData
     float posicaoDigital;
 
     // --------------------------------------------------------
-    // Evento especial
+    // EVENTO ESPECIAL
     // --------------------------------------------------------
 
     bool eventoEspecial;
@@ -95,31 +95,13 @@ private:
 
     DecisaoData resultado;
 
-    // --------------------------------------------------------
-    // Analisa array
-    // --------------------------------------------------------
-
     TipoEventoArray analisarArray(
         const LinhaData& linha
     );
 
 public:
 
-    // ========================================================
-    // CONSTRUTOR
-    // ========================================================
-
     DecisaoRobo();
-
-    // ========================================================
-    // UPDATE
-    //
-    // PRIORIDADE:
-    //
-    // 1. TOF
-    // 2. VERDE
-    // 3. ARRAY
-    // ========================================================
 
     void update(
         const AS7341Resultado& esquerda,
@@ -127,10 +109,6 @@ public:
         const LinhaData& linha,
         TOFAnalise& tof
     );
-
-    // ========================================================
-    // GET DATA
-    // ========================================================
 
     const DecisaoData& getData() const;
 };

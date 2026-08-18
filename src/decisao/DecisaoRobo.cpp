@@ -6,6 +6,10 @@
 
 DecisaoRobo::DecisaoRobo()
 {
+    // --------------------------------------------------------
+    // TOF
+    // --------------------------------------------------------
+
     resultado.eventoToF =
         TOF_NORMAL;
 
@@ -14,6 +18,10 @@ DecisaoRobo::DecisaoRobo()
 
     resultado.distanciaToF =
         0;
+
+    // --------------------------------------------------------
+    // VERDE
+    // --------------------------------------------------------
 
     resultado.acaoVerde =
         VERDE_SEM_EVENTO;
@@ -27,6 +35,10 @@ DecisaoRobo::DecisaoRobo()
     resultado.verdeDireita =
         false;
 
+    // --------------------------------------------------------
+    // ARRAY
+    // --------------------------------------------------------
+
     resultado.eventoArray =
         ARRAY_NORMAL;
 
@@ -35,6 +47,10 @@ DecisaoRobo::DecisaoRobo()
 
     resultado.posicaoDigital =
         0.0f;
+
+    // --------------------------------------------------------
+    // EVENTO ESPECIAL
+    // --------------------------------------------------------
 
     resultado.eventoEspecial =
         false;
@@ -59,7 +75,8 @@ TipoEventoArray DecisaoRobo::analisarArray(
 
     // --------------------------------------------------------
     // 5 ou mais sensores pretos
-    // = INTERSECÇÃO
+    //
+    // INTERSECÇÃO
     // --------------------------------------------------------
 
     if(linha.sensoresPretos >= 5)
@@ -68,9 +85,9 @@ TipoEventoArray DecisaoRobo::analisarArray(
     }
 
     // --------------------------------------------------------
-    // 2, 3 ou 4 sensores
+    // 2, 3 ou 4 sensores pretos
     //
-    // Define lado pela posição digital.
+    // CURVA / FALHA
     // --------------------------------------------------------
 
     if(linha.posicaoDigital < 0.0f)
@@ -84,10 +101,11 @@ TipoEventoArray DecisaoRobo::analisarArray(
     }
 
     // --------------------------------------------------------
-    // Caso central improvável
+    // Caso improvável:
+    // usa direita como padrão
     // --------------------------------------------------------
 
-    return ARRAY_NORMAL;
+    return ARRAY_CURVA_DIREITA;
 }
 
 // ============================================================
@@ -102,7 +120,7 @@ void DecisaoRobo::update(
 )
 {
     // ========================================================
-    // LIMPA EVENTOS DA ITERAÇÃO
+    // RESET
     // ========================================================
 
     resultado.eventoToF =
@@ -121,7 +139,7 @@ void DecisaoRobo::update(
         false;
 
     // ========================================================
-    // DADOS DO TOF
+    // DISTÂNCIA DO TOF
     // ========================================================
 
     resultado.distanciaToF =
@@ -146,8 +164,11 @@ void DecisaoRobo::update(
             true;
 
         // ----------------------------------------------------
-        // Mantemos os dados dos outros sensores disponíveis
-        // para diagnóstico, mas eles não decidem a ação.
+        // Mantemos os dados dos outros sensores para
+        // diagnóstico no Serial.
+        //
+        // Porém eles NÃO participam da decisão enquanto
+        // houver obstáculo.
         // ----------------------------------------------------
 
         resultado.verdeEsquerda =
@@ -170,7 +191,7 @@ void DecisaoRobo::update(
     }
 
     // ========================================================
-    // DADOS DOS AS7341
+    // DADOS DO AS7341
     // ========================================================
 
     resultado.verdeEsquerda =
@@ -200,7 +221,9 @@ void DecisaoRobo::update(
     if(resultado.verdeDetectado)
     {
         // ----------------------------------------------------
-        // Verde + 2 ou mais pretos
+        // Verde + 2 ou mais sensores pretos
+        //
+        // PASSAGEM RETA
         // ----------------------------------------------------
 
         if(resultado.sensoresPretos >= 2)
@@ -215,7 +238,9 @@ void DecisaoRobo::update(
         }
 
         // ----------------------------------------------------
-        // Verde dos dois lados
+        // Verde nos dois lados
+        //
+        // MEIA VOLTA
         // ----------------------------------------------------
 
         if(
@@ -271,26 +296,17 @@ void DecisaoRobo::update(
         analisarArray(linha);
 
     // --------------------------------------------------------
-    // Normal
+    // Evento especial
     // --------------------------------------------------------
 
     if(
-        resultado.eventoArray ==
+        resultado.eventoArray !=
         ARRAY_NORMAL
     )
     {
         resultado.eventoEspecial =
-            false;
-
-        return;
+            true;
     }
-
-    // --------------------------------------------------------
-    // Evento especial do array
-    // --------------------------------------------------------
-
-    resultado.eventoEspecial =
-        true;
 }
 
 // ============================================================
