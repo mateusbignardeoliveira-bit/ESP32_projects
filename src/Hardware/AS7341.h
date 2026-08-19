@@ -4,11 +4,12 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <Adafruit_AS7341.h>
+
 #include "TCA.h"
 
 
 // ============================================================
-// Dados de um AS7341
+// DADOS DE UM AS7341
 // ============================================================
 
 struct AS7341Data
@@ -32,9 +33,8 @@ struct AS7341Data
 };
 
 
-
 // ============================================================
-// Classe responsável pelos dois AS7341
+// CLASSE DOS DOIS AS7341
 // ============================================================
 
 class AS7341Sensores
@@ -50,7 +50,7 @@ private:
 
 
     // ========================================================
-    // Objetos dos dois sensores
+    // SENSORES
     // ========================================================
 
     Adafruit_AS7341 sensorDireita;
@@ -58,7 +58,7 @@ private:
 
 
     // ========================================================
-    // Canais do multiplexador
+    // CANAIS DO TCA
     // ========================================================
 
     static const uint8_t CANAL_DIREITA = 1;
@@ -66,15 +66,44 @@ private:
 
 
     // ========================================================
-    // Configuração do AS7341
+    // CONFIGURAÇÃO DO AS7341
+    // ========================================================
+    //
+    // Configuração anterior:
+    //
+    // ATIME = 29
+    // ASTEP = 599
+    //
+    // Tempo:
+    // 30 * 600 * 2.78us = aproximadamente 50ms
+    //
+    // Como readAllChannels() faz duas integrações por sensor,
+    // isso deixava a aquisição muito lenta.
+    //
+    // Nova configuração:
+    //
+    // ATIME = 9
+    // ASTEP = 199
+    //
+    // Tempo:
+    // 10 * 200 * 2.78us = aproximadamente 5.56ms
+    //
     // ========================================================
 
-    static const uint8_t ATIME = 29;
-    static const uint16_t ASTEP = 599;
+    static const uint8_t ATIME = 5;
+    static const uint16_t ASTEP = 5;
 
 
     // ========================================================
-    // Dados atuais
+    // GANHO
+    // ========================================================
+
+    static const as7341_gain_t GANHO =
+        AS7341_GAIN_32X;
+
+
+    // ========================================================
+    // DADOS
     // ========================================================
 
     AS7341Data dadosDireita;
@@ -82,7 +111,7 @@ private:
 
 
     // ========================================================
-    // Configura um sensor
+    // CONFIGURA SENSOR
     // ========================================================
 
     bool configurarSensor(
@@ -91,7 +120,7 @@ private:
 
 
     // ========================================================
-    // Converte leitura do sensor para nossa estrutura
+    // ARMAZENA LEITURA
     // ========================================================
 
     void armazenarLeitura(
@@ -103,7 +132,7 @@ private:
 public:
 
     // ========================================================
-    // Construtor
+    // CONSTRUTOR
     // ========================================================
 
     AS7341Sensores(
@@ -112,28 +141,28 @@ public:
 
 
     // ========================================================
-    // Inicializa os dois sensores
+    // BEGIN
     // ========================================================
 
     bool begin();
 
 
     // ========================================================
-    // Faz nova leitura dos dois sensores
+    // UPDATE
     // ========================================================
 
     bool update();
 
 
     // ========================================================
-    // Retorna dados da direita
+    // GET DIREITA
     // ========================================================
 
     AS7341Data getDireita();
 
 
     // ========================================================
-    // Retorna dados da esquerda
+    // GET ESQUERDA
     // ========================================================
 
     AS7341Data getEsquerda();

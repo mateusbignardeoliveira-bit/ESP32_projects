@@ -15,12 +15,10 @@ tca(controladorTCA)
     dadosDireita.valido = false;
     dadosDireita.tempo = 0;
 
-
     dadosEsquerda.valido = false;
     dadosEsquerda.tempo = 0;
 
 }
-
 
 
 // ============================================================
@@ -33,7 +31,7 @@ bool AS7341Sensores::configurarSensor(
 {
 
     // --------------------------------------------------------
-    // Inicializa o sensor
+    // Inicialização
     // --------------------------------------------------------
 
     if(!sensor.begin())
@@ -43,7 +41,7 @@ bool AS7341Sensores::configurarSensor(
 
 
     // --------------------------------------------------------
-    // Tempo de integração
+    // TEMPO DE INTEGRAÇÃO
     // --------------------------------------------------------
 
     sensor.setATIME(ATIME);
@@ -52,25 +50,23 @@ bool AS7341Sensores::configurarSensor(
 
 
     // --------------------------------------------------------
-    // Ganho
+    // GANHO
     // --------------------------------------------------------
 
     sensor.setGain(
-        AS7341_GAIN_32X
+        GANHO
     );
 
 
     // --------------------------------------------------------
-    // LED interno desligado
+    // LED INTERNO
     // --------------------------------------------------------
 
     sensor.enableLED(false);
 
 
     return true;
-
 }
-
 
 
 // ============================================================
@@ -81,7 +77,7 @@ bool AS7341Sensores::begin()
 {
 
     // ========================================================
-    // SENSOR DIREITA
+    // DIREITA
     // ========================================================
 
     if(!tca.selecionarCanal(CANAL_DIREITA))
@@ -97,7 +93,7 @@ bool AS7341Sensores::begin()
 
 
     // ========================================================
-    // SENSOR ESQUERDA
+    // ESQUERDA
     // ========================================================
 
     if(!tca.selecionarCanal(CANAL_ESQUERDA))
@@ -112,17 +108,15 @@ bool AS7341Sensores::begin()
     }
 
 
-    // --------------------------------------------------------
-    // Nenhum sensor fica selecionado ao terminar
-    // --------------------------------------------------------
+    // ========================================================
+    // DESLIGA TCA
+    // ========================================================
 
     tca.desligarCanais();
 
 
     return true;
-
 }
-
 
 
 // ============================================================
@@ -148,9 +142,10 @@ void AS7341Sensores::armazenarLeitura(
     // --------------------------------------------------------
     // F5 - F8
     //
-    // A biblioteca possui os canais auxiliares nos índices
-    // 4 e 5, portanto os canais espectrais que queremos
-    // ficam em 6, 7, 8 e 9.
+    // Os índices 4 e 5 são os Clear/NIR duplicados
+    // da primeira configuração SMUX.
+    //
+    // Os canais úteis F5-F8 estão em 6-9.
     // --------------------------------------------------------
 
     destino.F5 = readings[6];
@@ -160,18 +155,21 @@ void AS7341Sensores::armazenarLeitura(
 
 
     // --------------------------------------------------------
-    // Clear / NIR
+    // CLEAR / NIR
     // --------------------------------------------------------
 
     destino.clear = readings[10];
     destino.nir = readings[11];
 
 
+    // --------------------------------------------------------
+    // VALIDADE
+    // --------------------------------------------------------
+
     destino.valido = true;
+
     destino.tempo = millis();
-
 }
-
 
 
 // ============================================================
@@ -185,7 +183,7 @@ bool AS7341Sensores::update()
 
 
     // ========================================================
-    // DIREITA
+    // SENSOR DIREITO
     // ========================================================
 
     if(!tca.selecionarCanal(CANAL_DIREITA))
@@ -207,7 +205,7 @@ bool AS7341Sensores::update()
 
 
     // ========================================================
-    // ESQUERDA
+    // SENSOR ESQUERDO
     // ========================================================
 
     if(!tca.selecionarCanal(CANAL_ESQUERDA))
@@ -228,17 +226,15 @@ bool AS7341Sensores::update()
     );
 
 
-    // --------------------------------------------------------
-    // Desliga os canais após a leitura
-    // --------------------------------------------------------
+    // ========================================================
+    // DESLIGA TCA
+    // ========================================================
 
     tca.desligarCanais();
 
 
     return true;
-
 }
-
 
 
 // ============================================================
@@ -247,11 +243,8 @@ bool AS7341Sensores::update()
 
 AS7341Data AS7341Sensores::getDireita()
 {
-
     return dadosDireita;
-
 }
-
 
 
 // ============================================================
@@ -260,7 +253,5 @@ AS7341Data AS7341Sensores::getDireita()
 
 AS7341Data AS7341Sensores::getEsquerda()
 {
-
     return dadosEsquerda;
-
 }
