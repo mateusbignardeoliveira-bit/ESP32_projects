@@ -21,9 +21,9 @@
 // Portanto usamos duas condições simultâneas.
 //
 
-static const float LIMIAR_F4_F3 = 1.90f;
+static const float LIMIAR_F4_F3 = 1.80f;
 
-static const float LIMIAR_F4_F6 = 1.15f;
+static const float LIMIAR_F4_F6 = 1.05f;
 
 
 // ============================================================
