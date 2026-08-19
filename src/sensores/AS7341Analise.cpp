@@ -1,17 +1,30 @@
 #include "AS7341Analise.h"
 
 // ============================================================
-// CONFIGURAÇÃO INICIAL DA DETECÇÃO DE VERDE
+// CALIBRAÇÃO DA DETECÇÃO DE VERDE
 // ============================================================
-
-// O verde precisa ser maior que azul e vermelho
-// por uma margem mínima.
 //
-// IMPORTANTE:
-// Este valor NÃO é definitivo.
-// Vamos calibrá-lo usando as leituras reais do robô.
+// Baseado nas leituras reais do robô:
+//
+// VERDE:
+// F4/F3 ≈ 2.3 ~ 2.65
+// F4/F6 ≈ 1.49
+//
+// BRANCO:
+// F4/F3 ≈ 1.28 ~ 1.50
+// F4/F6 ≈ 0.80 ~ 0.92
+//
+// PRETO:
+// F4/F3 ≈ 1.10 ~ 1.41
+// F4/F6 ≈ 0.57 ~ 0.68
+//
+// Portanto usamos duas condições simultâneas.
+//
 
-static const float MARGEM_VERDE = 1.20f;
+static const float LIMIAR_F4_F3 = 1.90f;
+
+static const float LIMIAR_F4_F6 = 1.15f;
+
 
 // ============================================================
 // CONSTRUTOR
@@ -20,6 +33,7 @@ static const float MARGEM_VERDE = 1.20f;
 AS7341Analise::AS7341Analise()
 {
 }
+
 
 // ============================================================
 // INTENSIDADE GERAL
@@ -34,11 +48,9 @@ float AS7341Analise::calcularIntensidade(
         return 0;
     }
 
-    // Utilizamos o Clear como referência da
-    // quantidade total de luz recebida.
-
     return (float)dados.clear;
 }
+
 
 // ============================================================
 // AZUL
@@ -62,6 +74,7 @@ float AS7341Analise::calcularAzul(
     ) / 2.0f;
 }
 
+
 // ============================================================
 // VERDE
 // ============================================================
@@ -82,6 +95,7 @@ float AS7341Analise::calcularVerde(
         (float)dados.F4
     ) / 2.0f;
 }
+
 
 // ============================================================
 // VERMELHO
@@ -104,6 +118,7 @@ float AS7341Analise::calcularVermelho(
         (float)dados.F7
     ) / 2.0f;
 }
+
 
 // ============================================================
 // CANAL DOMINANTE
@@ -141,54 +156,97 @@ uint8_t AS7341Analise::descobrirCanalDominante(
     return 3;
 }
 
+
 // ============================================================
 // DETECTAR VERDE
 // ============================================================
 //
-// Primeira versão.
+// A detecção agora usa diretamente os canais:
 //
-// O verde precisa ser significativamente maior
-// que azul E vermelho.
+// F3 = referência na região verde
+// F4 = canal principal usado para caracterizar o verde
+// F6 = referência na região vermelho profundo
 //
-// Isso é propositalmente simples neste primeiro teste.
-// Depois vamos calibrar com dados reais.
+// O verde precisa:
+//
+// F4/F3 > 1.90
+//
+// E:
+//
+// F4/F6 > 1.15
+//
+// Isso foi definido usando as medições reais:
+//
+// VERDE:
+// F4/F3 ≈ 2.3 ~ 2.65
+// F4/F6 ≈ 1.49
+//
+// BRANCO:
+// F4/F3 ≈ 1.28 ~ 1.50
+// F4/F6 ≈ 0.80 ~ 0.92
+//
+// PRETO:
+// F4/F3 ≈ 1.10 ~ 1.41
+// F4/F6 ≈ 0.57 ~ 0.68
 //
 // ============================================================
 
 bool AS7341Analise::detectarVerde(
-    float azul,
-    float verde,
-    float vermelho
+    const AS7341Data& dados
 )
 {
-    // Não existe verde útil se a leitura for zero.
-
-    if(verde <= 0)
+    if(!dados.valido)
     {
         return false;
     }
 
-    // Evita divisão por zero e rejeita leituras
-    // onde os outros canais também estão muito baixos.
+    const float f3 =
+        (float)dados.F3;
 
-    if(azul <= 0 || vermelho <= 0)
+    const float f4 =
+        (float)dados.F4;
+
+    const float f6 =
+        (float)dados.F6;
+
+
+    // --------------------------------------------------------
+    // Evita divisão por zero
+    // --------------------------------------------------------
+
+    if(f3 <= 0 || f6 <= 0)
     {
         return false;
     }
 
-    // Verde precisa superar os dois canais
-    // por uma margem mínima.
+
+    // --------------------------------------------------------
+    // Razões espectrais
+    // --------------------------------------------------------
+
+    const float razaoF4F3 =
+        f4 / f3;
+
+    const float razaoF4F6 =
+        f4 / f6;
+
+
+    // --------------------------------------------------------
+    // Detecção
+    // --------------------------------------------------------
 
     if(
-        verde > azul * MARGEM_VERDE &&
-        verde > vermelho * MARGEM_VERDE
+        razaoF4F3 > LIMIAR_F4_F3 &&
+        razaoF4F6 > LIMIAR_F4_F6
     )
     {
         return true;
     }
 
+
     return false;
 }
+
 
 // ============================================================
 // ANALISAR
@@ -221,6 +279,7 @@ AS7341Resultado AS7341Analise::analisar(
 
     resultado.verdeDetectado = false;
 
+
     // --------------------------------------------------------
     // Sensor inválido
     // --------------------------------------------------------
@@ -232,12 +291,14 @@ AS7341Resultado AS7341Analise::analisar(
 
     resultado.valido = true;
 
+
     // --------------------------------------------------------
     // Intensidade
     // --------------------------------------------------------
 
     resultado.intensidade =
         calcularIntensidade(dados);
+
 
     // --------------------------------------------------------
     // Componentes
@@ -251,6 +312,7 @@ AS7341Resultado AS7341Analise::analisar(
 
     resultado.vermelho =
         calcularVermelho(dados);
+
 
     // --------------------------------------------------------
     // Razão vermelho / verde
@@ -267,6 +329,7 @@ AS7341Resultado AS7341Analise::analisar(
         resultado.razaoVermelhoVerde = 0;
     }
 
+
     // --------------------------------------------------------
     // Razão azul / verde
     // --------------------------------------------------------
@@ -281,6 +344,7 @@ AS7341Resultado AS7341Analise::analisar(
     {
         resultado.razaoAzulVerde = 0;
     }
+
 
     // --------------------------------------------------------
     // Razão NIR / Clear
@@ -297,6 +361,7 @@ AS7341Resultado AS7341Analise::analisar(
         resultado.razaoNIR = 0;
     }
 
+
     // --------------------------------------------------------
     // Canal dominante
     // --------------------------------------------------------
@@ -308,19 +373,18 @@ AS7341Resultado AS7341Analise::analisar(
             resultado.vermelho
         );
 
+
     // --------------------------------------------------------
     // VERDE
     // --------------------------------------------------------
 
     resultado.verdeDetectado =
-        detectarVerde(
-            resultado.azul,
-            resultado.verde,
-            resultado.vermelho
-        );
+        detectarVerde(dados);
+
 
     return resultado;
 }
+
 
 // ============================================================
 // COMPARAR DIREITA / ESQUERDA

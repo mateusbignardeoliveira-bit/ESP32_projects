@@ -107,13 +107,11 @@ private:
     );
 
     // --------------------------------------------------------
-    // Detecta verde
+    // Detecta verde diretamente pelos canais do AS7341
     // --------------------------------------------------------
 
     bool detectarVerde(
-        float azul,
-        float verde,
-        float vermelho
+        const AS7341Data& dados
     );
 };
 

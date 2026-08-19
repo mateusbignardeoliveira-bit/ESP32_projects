@@ -27,32 +27,22 @@ const int PINO_BOTAO = 32;
 // VELOCIDADES
 // ============================================================
 
-const int VELOCIDADE_RETA = 600;
-const int VELOCIDADE_CURVA = 520;
-const int VELOCIDADE_GIRO = 550;
-const int VELOCIDADE_ALINHAMENTO = 350;
+const int VELOCIDADE_RETA = 100;
+const int VELOCIDADE_CURVA = 100;
+const int VELOCIDADE_GIRO = 100;
+const int VELOCIDADE_ALINHAMENTO = 100;
 
 
 // ============================================================
 // TEMPOS DAS MANOBRAS
 // ============================================================
-//
-// São parâmetros centralizados para facilitar a calibração
-// posteriormente, sem alterar a lógica.
-//
 
 const unsigned long TEMPO_PASSAGEM_RETA = 300;
-
 const unsigned long TEMPO_CORRECAO_CURVA = 100;
-
 const unsigned long TEMPO_MAX_CURVA = 1400;
-
 const unsigned long TEMPO_MEIA_VOLTA = 950;
-
 const unsigned long TEMPO_MAX_ALINHAMENTO = 700;
-
 const unsigned long TEMPO_ALINHAMENTO_FINAL = 100;
-
 const unsigned long TEMPO_INTERSECCAO = 350;
 
 
@@ -61,11 +51,8 @@ const unsigned long TEMPO_INTERSECCAO = 350;
 // ============================================================
 
 const unsigned long TEMPO_GIRO_90 = 550;
-
 const unsigned long TEMPO_AVANCO_OBSTACULO = 650;
-
 const unsigned long TEMPO_AVANCO_RETORNO = 700;
-
 const unsigned long TEMPO_BUSCA_LINHA = 1000;
 
 
@@ -206,87 +193,6 @@ bool alinhamentoFinal = false;
 
 
 // ============================================================
-// NOME DA AÇÃO VERDE
-// ============================================================
-
-const char* nomeAcaoVerde(
-    TipoAcaoVerde acao
-)
-{
-    switch(acao)
-    {
-        case VERDE_SEM_EVENTO:
-            return "SEM EVENTO";
-
-        case VERDE_PASSAGEM_RETA:
-            return "PASSAGEM RETA";
-
-        case VERDE_CURVA_ESQUERDA:
-            return "CURVA ESQUERDA";
-
-        case VERDE_CURVA_DIREITA:
-            return "CURVA DIREITA";
-
-        case VERDE_MEIA_VOLTA:
-            return "MEIA VOLTA";
-
-        default:
-            return "DESCONHECIDA";
-    }
-}
-
-
-// ============================================================
-// NOME EVENTO ARRAY
-// ============================================================
-
-const char* nomeEventoArray(
-    TipoEventoArray evento
-)
-{
-    switch(evento)
-    {
-        case ARRAY_NORMAL:
-            return "NORMAL";
-
-        case ARRAY_CURVA_ESQUERDA:
-            return "CURVA ESQUERDA";
-
-        case ARRAY_CURVA_DIREITA:
-            return "CURVA DIREITA";
-
-        case ARRAY_INTERSECCAO:
-            return "INTERSECCAO";
-
-        default:
-            return "DESCONHECIDO";
-    }
-}
-
-
-// ============================================================
-// NOME EVENTO TOF
-// ============================================================
-
-const char* nomeEventoToF(
-    TipoEventoToF evento
-)
-{
-    switch(evento)
-    {
-        case TOF_NORMAL:
-            return "NORMAL";
-
-        case TOF_OBSTACULO:
-            return "OBSTACULO";
-
-        default:
-            return "DESCONHECIDO";
-    }
-}
-
-
-// ============================================================
 // INICIA MANOBRA
 // ============================================================
 
@@ -353,11 +259,6 @@ bool executarAlinhamento(
     const LinhaData& linha
 )
 {
-    // --------------------------------------------------------
-    // Se já está centralizado, faz pequena correção reta
-    // antes de devolver ao PID.
-    // --------------------------------------------------------
-
     if(linhaCentralizada(linha))
     {
         if(!alinhamentoFinal)
@@ -389,15 +290,13 @@ bool executarAlinhamento(
         return false;
     }
 
+
     alinhamentoFinal =
         false;
 
     inicioFase =
         millis();
 
-    // --------------------------------------------------------
-    // Linha à esquerda
-    // --------------------------------------------------------
 
     if(linha.posicao < 0.0f)
     {
@@ -408,11 +307,6 @@ bool executarAlinhamento(
             VELOCIDADE_ALINHAMENTO
         );
     }
-
-    // --------------------------------------------------------
-    // Linha à direita
-    // --------------------------------------------------------
-
     else
     {
         motorControlador.setSpeed(
@@ -423,9 +317,6 @@ bool executarAlinhamento(
         );
     }
 
-    // --------------------------------------------------------
-    // Segurança contra ficar preso
-    // --------------------------------------------------------
 
     if(
         millis() - inicioManobra >=
@@ -453,10 +344,6 @@ void executarCurva(
     unsigned long tempo =
         millis() - inicioManobra;
 
-
-    // --------------------------------------------------------
-    // Pequena correção inicial
-    // --------------------------------------------------------
 
     if(
         tempo <
@@ -486,10 +373,6 @@ void executarCurva(
     }
 
 
-    // --------------------------------------------------------
-    // Giro
-    // --------------------------------------------------------
-
     if(esquerda)
     {
         motorControlador.setSpeed(
@@ -510,10 +393,6 @@ void executarCurva(
     }
 
 
-    // --------------------------------------------------------
-    // Quando encontra novamente a linha, alinha
-    // --------------------------------------------------------
-
     if(
         tempo >
         TEMPO_CORRECAO_CURVA
@@ -528,10 +407,6 @@ void executarCurva(
     }
 
 
-    // --------------------------------------------------------
-    // Timeout
-    // --------------------------------------------------------
-
     if(
         tempo >=
         TEMPO_MAX_CURVA
@@ -543,7 +418,7 @@ void executarCurva(
 
 
 // ============================================================
-// INTERSECÇÃO
+// INTERSEÇÃO
 // ============================================================
 
 void executarInterseccao()
@@ -610,10 +485,6 @@ void executarMeiaVolta(
         millis() - inicioManobra;
 
 
-    // --------------------------------------------------------
-    // Giro
-    // --------------------------------------------------------
-
     motorControlador.setSpeed(
         VELOCIDADE_GIRO,
         VELOCIDADE_GIRO,
@@ -621,10 +492,6 @@ void executarMeiaVolta(
         -VELOCIDADE_GIRO
     );
 
-
-    // --------------------------------------------------------
-    // Depois do giro, procura a linha
-    // --------------------------------------------------------
 
     if(
         tempo >=
@@ -650,11 +517,6 @@ void executarObstaculo(
 
     switch(faseObstaculo)
     {
-
-        // ====================================================
-        // 1. GIRA 90° DIREITA
-        // ====================================================
-
         case OBSTACULO_GIRO_DIREITA:
 
             motorControlador.setSpeed(
@@ -678,10 +540,6 @@ void executarObstaculo(
 
             break;
 
-
-        // ====================================================
-        // 2. AVANÇA
-        // ====================================================
 
         case OBSTACULO_AVANCA_1:
 
@@ -707,10 +565,6 @@ void executarObstaculo(
             break;
 
 
-        // ====================================================
-        // 3. GIRA ESQUERDA
-        // ====================================================
-
         case OBSTACULO_GIRO_ESQUERDA_1:
 
             motorControlador.setSpeed(
@@ -734,10 +588,6 @@ void executarObstaculo(
 
             break;
 
-
-        // ====================================================
-        // 4. PASSA AO LADO DO OBSTÁCULO
-        // ====================================================
 
         case OBSTACULO_AVANCA_2:
 
@@ -763,10 +613,6 @@ void executarObstaculo(
             break;
 
 
-        // ====================================================
-        // 5. GIRA NOVAMENTE ESQUERDA
-        // ====================================================
-
         case OBSTACULO_GIRO_ESQUERDA_2:
 
             motorControlador.setSpeed(
@@ -790,10 +636,6 @@ void executarObstaculo(
 
             break;
 
-
-        // ====================================================
-        // 6. AVANÇA PARA LINHA
-        // ====================================================
 
         case OBSTACULO_AVANCA_3:
 
@@ -833,10 +675,6 @@ void executarObstaculo(
             break;
 
 
-        // ====================================================
-        // 7. VOLTA PARA ORIENTAÇÃO ORIGINAL
-        // ====================================================
-
         case OBSTACULO_GIRO_DIREITA_2:
 
             motorControlador.setSpeed(
@@ -860,10 +698,6 @@ void executarObstaculo(
 
             break;
 
-
-        // ====================================================
-        // 8. BUSCA LINHA
-        // ====================================================
 
         case OBSTACULO_BUSCA_LINHA:
 
@@ -900,10 +734,6 @@ void executarObstaculo(
             break;
 
 
-        // ====================================================
-        // 9. ALINHAMENTO FINAL
-        // ====================================================
-
         case OBSTACULO_ALINHAMENTO:
 
             executarAlinhamento(linha);
@@ -914,7 +744,7 @@ void executarObstaculo(
 
 
 // ============================================================
-// EXECUTA MANOBRA ATUAL
+// EXECUTA MANOBRA
 // ============================================================
 
 void executarManobra(
@@ -985,7 +815,7 @@ void executarManobra(
 
 
 // ============================================================
-// ESCOLHE MANOBRA DA DECISÃO
+// ESCOLHE MANOBRA
 // ============================================================
 
 void iniciarManobraDaDecisao(
@@ -993,7 +823,7 @@ void iniciarManobraDaDecisao(
 )
 {
     // --------------------------------------------------------
-    // OBSTÁCULO — prioridade absoluta
+    // Obstáculo tem prioridade
     // --------------------------------------------------------
 
     if(decisao.obstaculoDetectado)
@@ -1010,7 +840,7 @@ void iniciarManobraDaDecisao(
 
 
     // --------------------------------------------------------
-    // VERDE
+    // Verde
     // --------------------------------------------------------
 
     switch(decisao.acaoVerde)
@@ -1060,7 +890,7 @@ void iniciarManobraDaDecisao(
 
 
     // --------------------------------------------------------
-    // ARRAY
+    // Array
     // --------------------------------------------------------
 
     switch(decisao.eventoArray)
@@ -1107,15 +937,6 @@ void iniciarManobraDaDecisao(
 
 void setup()
 {
-    Serial.begin(115200);
-
-    delay(1000);
-
-
-    // ========================================================
-    // BOTÃO
-    // ========================================================
-
     pinMode(
         PINO_BOTAO,
         INPUT_PULLUP
@@ -1137,7 +958,7 @@ void setup()
     {
         while(true)
         {
-            delay(1000);
+            motorControlador.stop();
         }
     }
 
@@ -1150,7 +971,7 @@ void setup()
     {
         while(true)
         {
-            delay(1000);
+            motorControlador.stop();
         }
     }
 
@@ -1198,17 +1019,11 @@ void setup()
     // ========================================================
 
     motorControlador.stop();
-
-
-    Serial.println();
-    Serial.println("========================================");
-    Serial.println(" ROBO COMPLETO");
-    Serial.println("========================================");
 }
 
 
 // ============================================================
-// LOOP
+// LOOP PRINCIPAL
 // ============================================================
 
 void loop()
@@ -1323,7 +1138,7 @@ void loop()
 
 
     // ========================================================
-    // TOF SEMPRE TEM PRIORIDADE
+    // OBSTÁCULO — PRIORIDADE
     // ========================================================
 
     if(decisao.obstaculoDetectado)
@@ -1335,8 +1150,7 @@ void loop()
 
 
     // ========================================================
-    // SE NÃO EXISTE MANOBRA:
-    // ESCOLHE UMA
+    // ESCOLHE MANOBRA
     // ========================================================
 
     if(
@@ -1389,153 +1203,4 @@ void loop()
             controle.velocidadeDireita
         );
     }
-
-
-    // ========================================================
-    // SERIAL
-    // ========================================================
-
-    Serial.println();
-
-    Serial.println(
-        "========================================"
-    );
-
-    Serial.println(
-        " ROBO"
-    );
-
-    Serial.println(
-        "========================================"
-    );
-
-
-    Serial.print(
-        "ToF: "
-    );
-
-    Serial.print(
-        decisao.distanciaToF
-    );
-
-    Serial.println(
-        " mm"
-    );
-
-
-    Serial.print(
-        "Obstaculo: "
-    );
-
-    Serial.println(
-        decisao.obstaculoDetectado
-        ? "SIM"
-        : "NAO"
-    );
-
-
-    Serial.print(
-        "Verde E: "
-    );
-
-    Serial.println(
-        decisao.verdeEsquerda
-        ? "SIM"
-        : "NAO"
-    );
-
-
-    Serial.print(
-        "Verde D: "
-    );
-
-    Serial.println(
-        decisao.verdeDireita
-        ? "SIM"
-        : "NAO"
-    );
-
-
-    Serial.print(
-        "Pretos: "
-    );
-
-    Serial.println(
-        decisao.sensoresPretos
-    );
-
-
-    Serial.print(
-        "Posicao: "
-    );
-
-    Serial.println(
-        decisao.posicaoDigital
-    );
-
-
-    Serial.print(
-        "Evento array: "
-    );
-
-    Serial.println(
-        nomeEventoArray(
-            decisao.eventoArray
-        )
-    );
-
-
-    Serial.print(
-        "Acao verde: "
-    );
-
-    Serial.println(
-        nomeAcaoVerde(
-            decisao.acaoVerde
-        )
-    );
-
-
-    Serial.print(
-        "Estado: "
-    );
-
-    Serial.println(
-        estadoRobo.getNomeEstado()
-    );
-
-
-    Serial.print(
-        "Manobra: "
-    );
-
-    Serial.println(
-        (int)manobraAtual
-    );
-
-
-    Serial.print(
-        "Motor E: "
-    );
-
-    Serial.println(
-        motorControlador.getM1()
-    );
-
-
-    Serial.print(
-        "Motor D: "
-    );
-
-    Serial.println(
-        motorControlador.getM3()
-    );
-
-
-    Serial.println(
-        "========================================"
-    );
-
-
-    delay(10);
 }
