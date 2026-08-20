@@ -88,34 +88,23 @@ void CurvaAnalise::update(
     // S4 = índice 3
     // S5 = índice 4
     //
-    // Basta um dos dois estar ativo.
+    // Basta um dos dois encontrar a linha.
+    //
+    // Não usamos a posição aqui.
+    // O PID fará o alinhamento depois.
     // ========================================================
 
     bool s4 =
         linha.sensores[3] >=
         LIMIAR_PRETO;
 
-
     bool s5 =
         linha.sensores[4] >=
         LIMIAR_PRETO;
 
 
-    bool centroAtivo =
+    resultado.linhaCentral =
         s4 || s5;
-
-
-    if(centroAtivo)
-    {
-        if(
-            linha.posicao >= -2.5f &&
-            linha.posicao <= 2.5f
-        )
-        {
-            resultado.linhaCentral =
-                true;
-        }
-    }
 
 
     // ========================================================
