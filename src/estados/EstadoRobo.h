@@ -10,7 +10,9 @@ enum EstadoRobo
 
     ESTADO_CURVA_ESQUERDA,
 
-    ESTADO_CURVA_DIREITA
+    ESTADO_CURVA_DIREITA,
+
+    ESTADO_CRUZAMENTO
 };
 
 
@@ -35,6 +37,5 @@ public:
     EstadoRobo getEstado();
 
 };
-
 
 #endif

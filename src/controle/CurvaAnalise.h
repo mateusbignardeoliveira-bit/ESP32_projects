@@ -9,9 +9,7 @@
 enum DirecaoCurva
 {
     CURVA_NENHUMA,
-
     CURVA_ESQUERDA,
-
     CURVA_DIREITA
 };
 
@@ -29,6 +27,8 @@ struct CurvaData
     bool linhaCentral;
 
     bool linhaLarga;
+
+    bool cruzamento;
 };
 
 
@@ -45,7 +45,7 @@ private:
 
 
     // Quantidade mínima de sensores
-    // de um lado.
+    // de um lado para considerar curva.
 
     const int MINIMO_SENSORES_LADO =
         3;
@@ -55,6 +55,13 @@ private:
 
     const int DOMINANCIA_MINIMA =
         2;
+
+
+    // Quantidade mínima de sensores pretos
+    // para considerar cruzamento.
+
+    const int MINIMO_SENSORES_CRUZAMENTO =
+        7;
 
 
     CurvaData resultado;

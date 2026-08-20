@@ -86,11 +86,27 @@ const int VELOCIDADE_CURVA =
     400;
 
 
-// Tempo mínimo de giro antes de
-// procurar a linha novamente.
-
 const unsigned long TEMPO_MINIMO_CURVA =
     250;
+
+
+// ============================================================
+// CONFIGURAÇÃO DO CRUZAMENTO
+// ============================================================
+
+// Tempo que o robô permanece andando reto
+// sobre o cruzamento antes de devolver
+// o controle para o PID.
+
+const unsigned long TEMPO_CRUZAMENTO =
+    300;
+
+
+// Tempo durante o qual uma nova detecção
+// de cruzamento é ignorada após atravessá-lo.
+
+const unsigned long BLOQUEIO_CRUZAMENTO =
+    500;
 
 
 // ============================================================
@@ -102,6 +118,14 @@ unsigned long tempoAnteriorPID =
 
 
 unsigned long inicioCurva =
+    0;
+
+
+unsigned long inicioCruzamento =
+    0;
+
+
+unsigned long fimBloqueioCruzamento =
     0;
 
 
@@ -202,7 +226,7 @@ void loop()
 
 
     // ========================================================
-    // 3. ANALISA CURVA
+    // 3. ANALISA CURVA / CRUZAMENTO
     // ========================================================
 
     curva.update(
@@ -232,10 +256,45 @@ void loop()
     )
     {
         // ----------------------------------------------------
-        // Detecta curva
+        // Verifica se o bloqueio do cruzamento terminou
         // ----------------------------------------------------
 
-        if(dadosCurva.curva90)
+        bool cruzamentoLiberado =
+            millis() >= fimBloqueioCruzamento;
+
+
+        // ----------------------------------------------------
+        // Detecta cruzamento
+        //
+        // O cruzamento tem prioridade sobre a curva,
+        // pois possui 7 ou 8 sensores pretos.
+        // ----------------------------------------------------
+
+        if(
+            dadosCurva.cruzamento &&
+            cruzamentoLiberado
+        )
+        {
+            estado.definirEstado(
+                ESTADO_CRUZAMENTO
+            );
+
+
+            inicioCruzamento =
+                millis();
+
+
+            pid.reset();
+        }
+
+
+        // ----------------------------------------------------
+        // Detecta curva
+        //
+        // Mantida igual à implementação que funcionou.
+        // ----------------------------------------------------
+
+        else if(dadosCurva.curva90)
         {
             if(
                 dadosCurva.direcao ==
@@ -281,6 +340,67 @@ void loop()
 
     estadoAtual =
         estado.getEstado();
+
+
+    // ========================================================
+    // CRUZAMENTO
+    // ========================================================
+
+    if(
+        estadoAtual ==
+        ESTADO_CRUZAMENTO
+    )
+    {
+        unsigned long tempoCruzamento =
+            millis() - inicioCruzamento;
+
+
+        // ----------------------------------------------------
+        // Anda reto durante o cruzamento
+        // ----------------------------------------------------
+
+        direcao.update(
+            0.0f
+        );
+
+
+        MotoresData dadosMotores =
+            direcao.getData();
+
+
+        motores.setSpeed(
+            dadosMotores.m1,
+            dadosMotores.m2,
+            dadosMotores.m3,
+            dadosMotores.m4
+        );
+
+
+        // ----------------------------------------------------
+        // Terminou de atravessar
+        // ----------------------------------------------------
+
+        if(
+            tempoCruzamento >=
+            TEMPO_CRUZAMENTO
+        )
+        {
+            estado.definirEstado(
+                ESTADO_SEGUINDO_LINHA
+            );
+
+
+            fimBloqueioCruzamento =
+                millis() +
+                BLOQUEIO_CRUZAMENTO;
+
+
+            pid.reset();
+        }
+
+
+        return;
+    }
 
 
     // ========================================================
