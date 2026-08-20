@@ -16,28 +16,44 @@ const int PINO_BOTAO = 32;
 
 
 // ============================================================
-// VELOCIDADE
+// VELOCIDADES
 // ============================================================
 
-const int VELOCIDADE_ROBO = 200;
+const int VELOCIDADE_ROBO = 400;
+
+const int VELOCIDADE_VERDE = 60;
+
+const int VELOCIDADE_CURVA = 400;
 
 
 // ============================================================
 // FRENAGEM
 // ============================================================
-//
-// Velocidade negativa por pouco tempo para compensar
-// a inércia do robô.
-//
-// Começamos com:
-//     -100 por 80 ms
-//
-// Depois podemos ajustar esses dois valores.
-// ============================================================
 
 const int VELOCIDADE_FREIO = -1000;
 
 const int TEMPO_FREIO_MS = 100;
+
+
+// ============================================================
+// TEMPO DAS MANOBRAS
+// ============================================================
+//
+// Valores INICIAIS apenas para teste.
+//
+// Depois regulamos com o robô fisicamente.
+// ============================================================
+
+const int TEMPO_CURVA_90_MS = 350;
+
+const int TEMPO_MEIA_VOLTA_MS = 10000000;
+
+
+// ============================================================
+// SAÍDA DO VERDE
+// ============================================================
+
+const int LEITURAS_SEM_VERDE_NECESSARIAS = 3;
 
 
 // ============================================================
@@ -51,9 +67,6 @@ AS7341Sensores sensoresAS7341(tca);
 
 // ============================================================
 // ARRAY
-//
-// RX = 5
-// TX = 18
 // ============================================================
 
 ArrayLinha arrayLinha(
@@ -65,10 +78,7 @@ ArrayLinha arrayLinha(
 
 
 // ============================================================
-// CONTROLADOR DOS MOTORES
-//
-// RX = 16
-// TX = 17
+// MOTOR
 // ============================================================
 
 MotorControlador motorControlador(
@@ -87,14 +97,60 @@ AS7341Analise as7341Analise;
 
 
 // ============================================================
-// ESTADO
+// ESTADOS
 // ============================================================
 
-bool verdeDetectado = false;
+enum EstadoVerde
+{
+    NORMAL,
+
+    FREANDO,
+
+    AVANCANDO_VERDE,
+
+    CURVA_ESQUERDA,
+
+    CURVA_DIREITA,
+
+    MEIA_VOLTA,
+
+    FINALIZADO
+};
+
+
+EstadoVerde estado =
+    NORMAL;
 
 
 // ============================================================
-// PARAR ROBÔ
+// MEMÓRIA DO VERDE
+// ============================================================
+
+bool verdeEsquerda =
+    false;
+
+bool verdeDireita =
+    false;
+
+
+// ============================================================
+// CONTROLE DE TEMPO
+// ============================================================
+
+unsigned long tempoInicio =
+    0;
+
+
+// ============================================================
+// CONTROLE DE SAÍDA DO VERDE
+// ============================================================
+
+int leiturasSemVerde =
+    0;
+
+
+// ============================================================
+// PARAR
 // ============================================================
 
 void pararRobo()
@@ -104,43 +160,115 @@ void pararRobo()
 
 
 // ============================================================
-// FREAR E PARAR
-// ============================================================
-//
-// Executado somente quando o verde é detectado.
-//
-// 1. Inverte os motores brevemente.
-// 2. Depois manda STOP.
-// 3. O robô permanece parado.
-//
+// ANDAR NORMAL
 // ============================================================
 
-void frearERobotParar()
+void andarNormal()
 {
-    // --------------------------------------------------------
-    // FREIO
-    // --------------------------------------------------------
+    motorControlador.setSpeed(
+        VELOCIDADE_ROBO,
+        VELOCIDADE_ROBO,
+        VELOCIDADE_ROBO,
+        VELOCIDADE_ROBO
+    );
+}
 
+
+// ============================================================
+// ANDAR DEVAGAR
+// ============================================================
+
+void andarDevagar()
+{
+    motorControlador.setSpeed(
+        VELOCIDADE_VERDE,
+        VELOCIDADE_VERDE,
+        VELOCIDADE_VERDE,
+        VELOCIDADE_VERDE
+    );
+}
+
+
+// ============================================================
+// FREAR
+// ============================================================
+
+void frearRobo()
+{
     motorControlador.setSpeed(
         VELOCIDADE_FREIO,
         VELOCIDADE_FREIO,
         VELOCIDADE_FREIO,
         VELOCIDADE_FREIO
     );
+}
 
 
-    // --------------------------------------------------------
-    // MANTÉM O FREIO POR POUCO TEMPO
-    // --------------------------------------------------------
+// ============================================================
+// CURVA ESQUERDA
+// ============================================================
 
-    delay(TEMPO_FREIO_MS);
+void curvaEsquerda()
+{
+    motorControlador.setSpeed(
+        -VELOCIDADE_CURVA,
+        -VELOCIDADE_CURVA,
+        VELOCIDADE_CURVA,
+        VELOCIDADE_CURVA
+    );
+}
 
 
-    // --------------------------------------------------------
-    // PARADA COMPLETA
-    // --------------------------------------------------------
+// ============================================================
+// CURVA DIREITA
+// ============================================================
 
-    motorControlador.stop();
+void curvaDireita()
+{
+    motorControlador.setSpeed(
+        VELOCIDADE_CURVA,
+        VELOCIDADE_CURVA,
+        -VELOCIDADE_CURVA,
+        -VELOCIDADE_CURVA
+    );
+}
+
+
+// ============================================================
+// MEIA VOLTA
+// ============================================================
+
+void meiaVolta()
+{
+    motorControlador.setSpeed(
+        VELOCIDADE_CURVA,
+        VELOCIDADE_CURVA,
+        -VELOCIDADE_CURVA,
+        -VELOCIDADE_CURVA
+    );
+}
+
+
+// ============================================================
+// RESET
+// ============================================================
+
+void resetVerde()
+{
+    estado =
+        NORMAL;
+
+    verdeEsquerda =
+        false;
+
+    verdeDireita =
+        false;
+
+    leiturasSemVerde =
+        0;
+
+    tempoInicio =
+        0;
 }
 
 
@@ -150,6 +278,9 @@ void frearERobotParar()
 
 void setup()
 {
+    Serial.begin(115200);
+
+
     // --------------------------------------------------------
     // BOTÃO
     // --------------------------------------------------------
@@ -161,7 +292,7 @@ void setup()
 
 
     // --------------------------------------------------------
-    // SEGURANÇA INICIAL
+    // SEGURANÇA
     // --------------------------------------------------------
 
     motorControlador.stop();
@@ -185,6 +316,7 @@ void setup()
         while(true)
         {
             motorControlador.stop();
+
             delay(100);
         }
     }
@@ -205,7 +337,7 @@ void setup()
 
 
     // --------------------------------------------------------
-    // SEGURANÇA FINAL DO SETUP
+    // SEGURANÇA
     // --------------------------------------------------------
 
     motorControlador.stop();
@@ -228,21 +360,7 @@ void loop()
     {
         pararRobo();
 
-        verdeDetectado = false;
-
-        return;
-    }
-
-
-    // ========================================================
-    // SE JÁ DETECTOU VERDE
-    //
-    // Não volta a andar.
-    // ========================================================
-
-    if(verdeDetectado)
-    {
-        pararRobo();
+        resetVerde();
 
         return;
     }
@@ -256,7 +374,7 @@ void loop()
 
 
     // ========================================================
-    // OBTÉM DADOS
+    // DADOS
     // ========================================================
 
     AS7341Data dadosEsquerda =
@@ -267,7 +385,7 @@ void loop()
 
 
     // ========================================================
-    // ANALISA ESQUERDO
+    // ANÁLISE
     // ========================================================
 
     AS7341Resultado esquerda =
@@ -276,10 +394,6 @@ void loop()
         );
 
 
-    // ========================================================
-    // ANALISA DIREITO
-    // ========================================================
-
     AS7341Resultado direita =
         as7341Analise.analisar(
             dadosDireita
@@ -287,37 +401,390 @@ void loop()
 
 
     // ========================================================
-    // DETECÇÃO DE VERDE
-    //
-    // Qualquer um dos sensores detectando verde
-    // é suficiente para parar o robô.
+    // NORMAL
     // ========================================================
 
     if(
-        esquerda.verdeDetectado ||
-        direita.verdeDetectado
+        estado ==
+        NORMAL
     )
     {
-        verdeDetectado = true;
+        if(
+            esquerda.verdeDetectado ||
+            direita.verdeDetectado
+        )
+        {
+            Serial.println(
+                "VERDE DETECTADO"
+            );
+
+
+            // -----------------------------------------------
+            // GUARDA O PRIMEIRO RESULTADO
+            // -----------------------------------------------
+
+            if(
+                esquerda.verdeDetectado
+            )
+            {
+                verdeEsquerda =
+                    true;
+            }
+
+
+            if(
+                direita.verdeDetectado
+            )
+            {
+                verdeDireita =
+                    true;
+            }
+
+
+            // -----------------------------------------------
+            // FREIO
+            // -----------------------------------------------
+
+            frearRobo();
+
+            tempoInicio =
+                millis();
+
+            estado =
+                FREANDO;
+
+            return;
+        }
+
 
         // ----------------------------------------------------
-        // FREIA E PARA
+        // ANDA NORMAL
         // ----------------------------------------------------
 
-        frearERobotParar();
+        andarNormal();
 
         return;
     }
 
 
     // ========================================================
-    // MOVIMENTO NORMAL
+    // FREANDO
     // ========================================================
 
-    motorControlador.setSpeed(
-        VELOCIDADE_ROBO,
-        VELOCIDADE_ROBO,
-        VELOCIDADE_ROBO,
-        VELOCIDADE_ROBO
-    );
+    if(
+        estado ==
+        FREANDO
+    )
+    {
+        frearRobo();
+
+
+        if(
+            millis() -
+            tempoInicio >=
+            TEMPO_FREIO_MS
+        )
+        {
+            Serial.println(
+                "FREIO TERMINADO"
+            );
+
+
+            pararRobo();
+
+
+            leiturasSemVerde =
+                0;
+
+
+            estado =
+                AVANCANDO_VERDE;
+        }
+
+
+        return;
+    }
+
+
+    // ========================================================
+    // AVANÇANDO SOBRE O VERDE
+    // ========================================================
+
+    if(
+        estado ==
+        AVANCANDO_VERDE
+    )
+    {
+        // ----------------------------------------------------
+        // ANDA DEVAGAR
+        // ----------------------------------------------------
+
+        andarDevagar();
+
+
+        // ----------------------------------------------------
+        // ACUMULA DETECÇÕES
+        // ----------------------------------------------------
+
+        if(
+            esquerda.verdeDetectado
+        )
+        {
+            verdeEsquerda =
+                true;
+        }
+
+
+        if(
+            direita.verdeDetectado
+        )
+        {
+            verdeDireita =
+                true;
+        }
+
+
+        // ----------------------------------------------------
+        // VERIFICA SE AINDA ESTÁ NO VERDE
+        // ----------------------------------------------------
+
+        if(
+            esquerda.verdeDetectado ||
+            direita.verdeDetectado
+        )
+        {
+            leiturasSemVerde =
+                0;
+        }
+        else
+        {
+            leiturasSemVerde++;
+
+
+            if(
+                leiturasSemVerde >=
+                LEITURAS_SEM_VERDE_NECESSARIAS
+            )
+            {
+                // -------------------------------------------
+                // SAIU DO VERDE
+                // -------------------------------------------
+
+                pararRobo();
+
+
+                Serial.println(
+                    "SAIU DO VERDE"
+                );
+
+
+                Serial.print(
+                    "Esquerda: "
+                );
+
+                Serial.println(
+                    verdeEsquerda
+                );
+
+
+                Serial.print(
+                    "Direita: "
+                );
+
+                Serial.println(
+                    verdeDireita
+                );
+
+
+                // -------------------------------------------
+                // DECIDE A MANOBRA
+                // -------------------------------------------
+
+                if(
+                    verdeEsquerda &&
+                    !verdeDireita
+                )
+                {
+                    Serial.println(
+                        "CURVA ESQUERDA"
+                    );
+
+
+                    tempoInicio =
+                        millis();
+
+
+                    estado =
+                        CURVA_ESQUERDA;
+                }
+
+
+                else if(
+                    verdeDireita &&
+                    !verdeEsquerda
+                )
+                {
+                    Serial.println(
+                        "CURVA DIREITA"
+                    );
+
+
+                    tempoInicio =
+                        millis();
+
+
+                    estado =
+                        CURVA_DIREITA;
+                }
+
+
+                else if(
+                    verdeEsquerda &&
+                    verdeDireita
+                )
+                {
+                    Serial.println(
+                        "MEIA VOLTA"
+                    );
+
+
+                    tempoInicio =
+                        millis();
+
+
+                    estado =
+                        MEIA_VOLTA;
+                }
+
+
+                else
+                {
+                    Serial.println(
+                        "NENHUM VERDE - ERRO"
+                    );
+
+
+                    estado =
+                        FINALIZADO;
+                }
+            }
+        }
+
+
+        return;
+    }
+
+
+    // ========================================================
+    // CURVA ESQUERDA
+    // ========================================================
+
+    if(
+        estado ==
+        CURVA_ESQUERDA
+    )
+    {
+        curvaEsquerda();
+
+
+        if(
+            millis() -
+            tempoInicio >=
+            TEMPO_CURVA_90_MS
+        )
+        {
+            pararRobo();
+
+            Serial.println(
+                "CURVA ESQUERDA TERMINADA"
+            );
+
+            estado =
+                FINALIZADO;
+        }
+
+
+        return;
+    }
+
+
+    // ========================================================
+    // CURVA DIREITA
+    // ========================================================
+
+    if(
+        estado ==
+        CURVA_DIREITA
+    )
+    {
+        curvaDireita();
+
+
+        if(
+            millis() -
+            tempoInicio >=
+            TEMPO_CURVA_90_MS
+        )
+        {
+            pararRobo();
+
+            Serial.println(
+                "CURVA DIREITA TERMINADA"
+            );
+
+            estado =
+                FINALIZADO;
+        }
+
+
+        return;
+    }
+
+
+    // ========================================================
+    // MEIA VOLTA
+    // ========================================================
+
+    if(
+        estado ==
+        MEIA_VOLTA
+    )
+    {
+        meiaVolta();
+
+
+        if(
+            millis() -
+            tempoInicio >=
+            TEMPO_MEIA_VOLTA_MS
+        )
+        {
+            pararRobo();
+
+            Serial.println(
+                "MEIA VOLTA TERMINADA"
+            );
+
+            estado =
+                FINALIZADO;
+        }
+
+
+        return;
+    }
+
+
+    // ========================================================
+    // FINALIZADO
+    // ========================================================
+
+    if(
+        estado ==
+        FINALIZADO
+    )
+    {
+        pararRobo();
+
+        return;
+    }
 }
