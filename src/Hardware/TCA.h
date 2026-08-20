@@ -58,8 +58,7 @@ public:
     void begin(
         int SDA = -1,
         int SCL = -1,
-        uint32_t frequencia = 100000
-    );
+        uint32_t frequencia = 400000    );
 
 
     // ========================================================

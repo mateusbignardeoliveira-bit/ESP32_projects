@@ -2,12 +2,22 @@
 
 #include "hardware/ArrayLinha.h"
 #include "hardware/MotorControlador.h"
+#include "hardware/TCA.h"
+#include "hardware/AS7341.h"
+#include "hardware/TOF200F.h"
 
 #include "sensores/LinhaAnalise.h"
 #include "controle/PIDLinha.h"
 #include "controle/ControleDirecao.h"
 #include "controle/CurvaAnalise.h"
 #include "Estados/EstadoRobo.h"
+
+
+// ============================================================
+// PINOS
+// ============================================================
+
+const int PINO_BOTAO = 32;
 
 
 // ============================================================
@@ -33,6 +43,26 @@ MotorControlador motores(
     Serial1,
     16,
     17
+);
+
+
+// ============================================================
+// TCA9548A
+// ============================================================
+
+TCA tca;
+
+
+// ============================================================
+// SENSORES
+// ============================================================
+
+AS7341Sensores sensoresCor(
+    tca
+);
+
+TOF200F tof(
+    tca
 );
 
 
@@ -65,7 +95,7 @@ ControleDirecao direcao(
 
 
 // ============================================================
-// ANÁLISE DE CURVA
+// ANÁLISE DE CURVA / CRUZAMENTO
 // ============================================================
 
 CurvaAnalise curva;
@@ -79,7 +109,7 @@ EstadoRoboControl estado;
 
 
 // ============================================================
-// CONFIGURAÇÃO DA CURVA
+// CONFIGURAÇÕES
 // ============================================================
 
 const int VELOCIDADE_CURVA =
@@ -91,46 +121,59 @@ const unsigned long TEMPO_MINIMO_CURVA =
 
 
 // ============================================================
-// CONFIGURAÇÃO DO CRUZAMENTO
+// CANCELAMENTO DE INÉRCIA
 // ============================================================
 
-// Tempo que o robô permanece andando reto
-// sobre o cruzamento antes de devolver
-// o controle para o PID.
+const int VELOCIDADE_FREIO =
+    -1000;
+
+
+const unsigned long TEMPO_FREIO_CURVA =
+    20;
+
+
+// ============================================================
+// CRUZAMENTO
+// ============================================================
 
 const unsigned long TEMPO_CRUZAMENTO =
     300;
 
-
-// Tempo durante o qual uma nova detecção
-// de cruzamento é ignorada após atravessá-lo.
 
 const unsigned long BLOQUEIO_CRUZAMENTO =
     500;
 
 
 // ============================================================
-// CONTROLE DE TEMPO
+// OBSTÁCULO
+// ============================================================
+
+const int DISTANCIA_OBSTACULO_MM =
+    100;
+
+
+// ============================================================
+// TEMPOS
 // ============================================================
 
 unsigned long tempoAnteriorPID =
     0;
 
-
 unsigned long inicioCurva =
     0;
 
+unsigned long inicioFreioCurva =
+    0;
 
 unsigned long inicioCruzamento =
     0;
-
 
 unsigned long fimBloqueioCruzamento =
     0;
 
 
 // ============================================================
-// GIRO PARA ESQUERDA
+// GIRO ESQUERDA
 // ============================================================
 
 void girarEsquerda()
@@ -138,23 +181,53 @@ void girarEsquerda()
     motores.setSpeed(
         -VELOCIDADE_CURVA,
         -VELOCIDADE_CURVA,
-        VELOCIDADE_CURVA,
-        VELOCIDADE_CURVA
+         VELOCIDADE_CURVA,
+         VELOCIDADE_CURVA
     );
 }
 
 
 // ============================================================
-// GIRO PARA DIREITA
+// GIRO DIREITA
 // ============================================================
 
 void girarDireita()
 {
     motores.setSpeed(
-        VELOCIDADE_CURVA,
-        VELOCIDADE_CURVA,
+         VELOCIDADE_CURVA,
+         VELOCIDADE_CURVA,
         -VELOCIDADE_CURVA,
         -VELOCIDADE_CURVA
+    );
+}
+
+
+// ============================================================
+// CANCELA INÉRCIA
+// ============================================================
+
+void cancelarInercia()
+{
+    motores.setSpeed(
+        VELOCIDADE_FREIO,
+        VELOCIDADE_FREIO,
+        VELOCIDADE_FREIO,
+        VELOCIDADE_FREIO
+    );
+}
+
+
+// ============================================================
+// PARA ROBÔ
+// ============================================================
+
+void pararRobo()
+{
+    motores.setSpeed(
+        0,
+        0,
+        0,
+        0
     );
 }
 
@@ -170,24 +243,65 @@ void setup()
     delay(500);
 
 
-    // Inicializa array
+    // --------------------------------------------------------
+    // BOTÃO
+    // HIGH = anda
+    // LOW  = para
+    // --------------------------------------------------------
+
+    pinMode(
+        PINO_BOTAO,
+        INPUT
+    );
+
+
+    // --------------------------------------------------------
+    // TCA
+    // --------------------------------------------------------
+
+    tca.begin(
+        -1,
+        -1,
+        400000
+    );
+
+
+    // --------------------------------------------------------
+    // ARRAY
+    // --------------------------------------------------------
 
     arrayLinha.begin();
 
 
-    // Inicializa motores
+    // --------------------------------------------------------
+    // MOTORES
+    // --------------------------------------------------------
 
     motores.begin();
 
 
-    // Garante motores parados
+    // --------------------------------------------------------
+    // TOF
+    // Canal 0
+    // --------------------------------------------------------
 
-    motores.setSpeed(
-        0,
-        0,
-        0,
-        0
-    );
+    tof.begin(0);
+
+
+    // --------------------------------------------------------
+    // AS7341
+    // Canal 1 = direita
+    // Canal 2 = esquerda
+    // --------------------------------------------------------
+
+    sensoresCor.begin();
+
+
+    // --------------------------------------------------------
+    // Motores inicialmente parados
+    // --------------------------------------------------------
+
+    pararRobo();
 
 
     tempoAnteriorPID =
@@ -202,7 +316,54 @@ void setup()
 void loop()
 {
     // ========================================================
-    // 1. LÊ ARRAY
+    // BOTÃO DE SEGURANÇA
+    // ========================================================
+
+    if(
+        digitalRead(PINO_BOTAO) == LOW
+    )
+    {
+        pararRobo();
+
+        return;
+    }
+
+
+    // ========================================================
+    // AQUISIÇÃO DOS SENSORES I2C
+    //
+    // Essas funções NÃO devem esperar conversão.
+    // Apenas atualizam quando existe resultado pronto.
+    // ========================================================
+
+    tof.update();
+
+    sensoresCor.update();
+
+
+    // ========================================================
+    // OBSTÁCULO
+    //
+    // 100 mm = 10 cm
+    // ========================================================
+
+    int distancia =
+        tof.getDistance();
+
+
+    if(
+        distancia > 0 &&
+        distancia <= DISTANCIA_OBSTACULO_MM
+    )
+    {
+        pararRobo();
+
+        return;
+    }
+
+
+    // ========================================================
+    // ARRAY
     // ========================================================
 
     arrayLinha.update();
@@ -213,7 +374,7 @@ void loop()
 
 
     // ========================================================
-    // 2. ANALISA LINHA
+    // LINHA
     // ========================================================
 
     linha.update(
@@ -226,7 +387,7 @@ void loop()
 
 
     // ========================================================
-    // 3. ANALISA CURVA / CRUZAMENTO
+    // CURVA / CRUZAMENTO
     // ========================================================
 
     curva.update(
@@ -239,7 +400,7 @@ void loop()
 
 
     // ========================================================
-    // 4. PEGA ESTADO ATUAL
+    // ESTADO
     // ========================================================
 
     EstadoRobo estadoAtual =
@@ -247,7 +408,7 @@ void loop()
 
 
     // ========================================================
-    // 5. ESTADO SEGUINDO LINHA
+    // SEGUINDO LINHA
     // ========================================================
 
     if(
@@ -255,19 +416,12 @@ void loop()
         ESTADO_SEGUINDO_LINHA
     )
     {
-        // ----------------------------------------------------
-        // Verifica se o bloqueio do cruzamento terminou
-        // ----------------------------------------------------
-
         bool cruzamentoLiberado =
             millis() >= fimBloqueioCruzamento;
 
 
         // ----------------------------------------------------
-        // Detecta cruzamento
-        //
-        // O cruzamento tem prioridade sobre a curva,
-        // pois possui 7 ou 8 sensores pretos.
+        // CRUZAMENTO
         // ----------------------------------------------------
 
         if(
@@ -289,12 +443,12 @@ void loop()
 
 
         // ----------------------------------------------------
-        // Detecta curva
-        //
-        // Mantida igual à implementação que funcionou.
+        // CURVA DE 90°
         // ----------------------------------------------------
 
-        else if(dadosCurva.curva90)
+        else if(
+            dadosCurva.curva90
+        )
         {
             if(
                 dadosCurva.direcao ==
@@ -306,15 +460,28 @@ void loop()
                 );
 
 
-                inicioCurva =
+                // ============================================
+                // COMEÇA CANCELAMENTO DE INÉRCIA
+                // ============================================
+
+                inicioFreioCurva =
                     millis();
 
 
+                inicioCurva = 0;
+
+
                 pid.reset();
+
+
+                cancelarInercia();
+
+
+                return;
             }
 
 
-            else if(
+            if(
                 dadosCurva.direcao ==
                 CURVA_DIREITA
             )
@@ -324,11 +491,24 @@ void loop()
                 );
 
 
-                inicioCurva =
+                // ============================================
+                // COMEÇA CANCELAMENTO DE INÉRCIA
+                // ============================================
+
+                inicioFreioCurva =
                     millis();
 
 
+                inicioCurva = 0;
+
+
                 pid.reset();
+
+
+                cancelarInercia();
+
+
+                return;
             }
         }
     }
@@ -351,12 +531,13 @@ void loop()
         ESTADO_CRUZAMENTO
     )
     {
-        unsigned long tempoCruzamento =
-            millis() - inicioCruzamento;
+        unsigned long tempo =
+            millis() -
+            inicioCruzamento;
 
 
         // ----------------------------------------------------
-        // Anda reto durante o cruzamento
+        // Reto
         // ----------------------------------------------------
 
         direcao.update(
@@ -377,11 +558,11 @@ void loop()
 
 
         // ----------------------------------------------------
-        // Terminou de atravessar
+        // Terminou
         // ----------------------------------------------------
 
         if(
-            tempoCruzamento >=
+            tempo >=
             TEMPO_CRUZAMENTO
         )
         {
@@ -412,12 +593,46 @@ void loop()
         ESTADO_CURVA_ESQUERDA
     )
     {
-        unsigned long tempoCurva =
-            millis() - inicioCurva;
+        // ----------------------------------------------------
+        // CANCELAMENTO DE INÉRCIA
+        // ----------------------------------------------------
+
+        unsigned long tempoFreio =
+            millis() -
+            inicioFreioCurva;
+
+
+        if(
+            tempoFreio <
+            TEMPO_FREIO_CURVA
+        )
+        {
+            cancelarInercia();
+
+            return;
+        }
 
 
         // ----------------------------------------------------
-        // Tempo mínimo de giro
+        // Só começa a contar a curva DEPOIS do freio
+        // ----------------------------------------------------
+
+        if(
+            inicioCurva == 0
+        )
+        {
+            inicioCurva =
+                millis();
+        }
+
+
+        unsigned long tempoCurva =
+            millis() -
+            inicioCurva;
+
+
+        // ----------------------------------------------------
+        // Giro mínimo
         // ----------------------------------------------------
 
         if(
@@ -432,7 +647,7 @@ void loop()
 
 
         // ----------------------------------------------------
-        // Procura linha novamente
+        // Procura linha
         // ----------------------------------------------------
 
         if(
@@ -444,6 +659,10 @@ void loop()
                 ESTADO_SEGUINDO_LINHA
             );
 
+
+            inicioCurva = 0;
+
+            inicioFreioCurva = 0;
 
             pid.reset();
         }
@@ -465,12 +684,46 @@ void loop()
         ESTADO_CURVA_DIREITA
     )
     {
-        unsigned long tempoCurva =
-            millis() - inicioCurva;
+        // ----------------------------------------------------
+        // CANCELAMENTO DE INÉRCIA
+        // ----------------------------------------------------
+
+        unsigned long tempoFreio =
+            millis() -
+            inicioFreioCurva;
+
+
+        if(
+            tempoFreio <
+            TEMPO_FREIO_CURVA
+        )
+        {
+            cancelarInercia();
+
+            return;
+        }
 
 
         // ----------------------------------------------------
-        // Tempo mínimo de giro
+        // Começa curva depois do freio
+        // ----------------------------------------------------
+
+        if(
+            inicioCurva == 0
+        )
+        {
+            inicioCurva =
+                millis();
+        }
+
+
+        unsigned long tempoCurva =
+            millis() -
+            inicioCurva;
+
+
+        // ----------------------------------------------------
+        // Giro mínimo
         // ----------------------------------------------------
 
         if(
@@ -485,7 +738,7 @@ void loop()
 
 
         // ----------------------------------------------------
-        // Procura linha novamente
+        // Procura linha
         // ----------------------------------------------------
 
         if(
@@ -497,6 +750,10 @@ void loop()
                 ESTADO_SEGUINDO_LINHA
             );
 
+
+            inicioCurva = 0;
+
+            inicioFreioCurva = 0;
 
             pid.reset();
         }
@@ -510,7 +767,7 @@ void loop()
 
 
     // ========================================================
-    // ATUALIZA ESTADO NOVAMENTE
+    // ATUALIZA ESTADO
     // ========================================================
 
     estadoAtual =
@@ -518,7 +775,7 @@ void loop()
 
 
     // ========================================================
-    // SEGUINDO LINHA COM PID
+    // PID
     // ========================================================
 
     if(
@@ -531,7 +788,10 @@ void loop()
 
 
         float deltaTime =
-            (agora - tempoAnteriorPID)
+            (
+                agora -
+                tempoAnteriorPID
+            )
             / 1000000.0f;
 
 
@@ -540,10 +800,12 @@ void loop()
 
 
         // ----------------------------------------------------
-        // LINHA DETECTADA
+        // Linha
         // ----------------------------------------------------
 
-        if(dadosLinha.linhaDetectada)
+        if(
+            dadosLinha.linhaDetectada
+        )
         {
             pid.update(
                 dadosLinha.erro,
@@ -562,13 +824,11 @@ void loop()
 
 
         // ----------------------------------------------------
-        // GAP
+        // Gap
         // ----------------------------------------------------
 
         else
         {
-            // Continua reto durante o gap.
-
             direcao.update(
                 0.0f
             );
@@ -576,7 +836,7 @@ void loop()
 
 
         // ----------------------------------------------------
-        // ENVIA VELOCIDADES
+        // Motores
         // ----------------------------------------------------
 
         MotoresData dadosMotores =
@@ -591,6 +851,10 @@ void loop()
         );
     }
 
+
+    // ========================================================
+    // PEQUENO INTERVALO
+    // ========================================================
 
     delay(5);
 }

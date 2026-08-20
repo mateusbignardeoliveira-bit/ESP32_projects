@@ -16,13 +16,8 @@ private:
 
     Adafruit_VL53L0X lox;
 
-
     uint8_t canal;
 
-
-    // --------------------------------------------------------
-    // Filtro
-    // --------------------------------------------------------
 
     static const int NUM_LEITURAS = 3;
 
@@ -32,35 +27,27 @@ private:
 
     int totalSoma;
 
-
-    // --------------------------------------------------------
-    // Última distância válida
-    // --------------------------------------------------------
-
     int distanciaAtual;
-
-
-    // --------------------------------------------------------
-    // Correção de calibração
-    // --------------------------------------------------------
 
     static constexpr int OFFSET_CORRECAO_MM = -20;
 
 
 public:
 
-    TOF200F(TCA& multiplexador);
+    TOF200F(
+        TCA& multiplexador
+    );
 
 
-    // Inicializa o sensor no canal indicado do TCA
-    bool begin(uint8_t canalTCA);
+    bool begin(
+        uint8_t canalTCA
+    );
 
 
-    // Atualiza a leitura
+    // Não bloqueante
     void update();
 
 
-    // Retorna distância filtrada em mm
     int getDistance();
 
 };

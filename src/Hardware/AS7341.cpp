@@ -1,94 +1,173 @@
 #include "AS7341.h"
 
 
-// ============================================================
-// CONSTRUTOR
-// ============================================================
-
 AS7341Sensores::AS7341Sensores(
     TCA& controladorTCA
 )
 :
 tca(controladorTCA)
 {
-
     dadosDireita.valido = false;
     dadosDireita.tempo = 0;
 
     dadosEsquerda.valido = false;
     dadosEsquerda.tempo = 0;
 
+    lendoDireita = false;
+    lendoEsquerda = false;
 }
 
-
-// ============================================================
-// CONFIGURAR SENSOR
-// ============================================================
 
 bool AS7341Sensores::configurarSensor(
     Adafruit_AS7341& sensor
 )
 {
-
-    // --------------------------------------------------------
-    // Inicialização
-    // --------------------------------------------------------
-
     if(!sensor.begin())
+    {
+        return false;
+    }
+
+    sensor.setATIME(
+        ATIME
+    );
+
+    sensor.setASTEP(
+        ASTEP
+    );
+
+    sensor.setGain(
+        GANHO
+    );
+
+    sensor.enableLED(
+        false
+    );
+
+    return true;
+}
+
+
+bool AS7341Sensores::begin()
+{
+    // --------------------------------------------------------
+    // DIREITA
+    // --------------------------------------------------------
+
+    if(!tca.selecionarCanal(
+        CANAL_DIREITA
+    ))
+    {
+        return false;
+    }
+
+    if(!configurarSensor(
+        sensorDireita
+    ))
     {
         return false;
     }
 
 
     // --------------------------------------------------------
-    // TEMPO DE INTEGRAÇÃO
+    // ESQUERDA
     // --------------------------------------------------------
 
-    sensor.setATIME(ATIME);
+    if(!tca.selecionarCanal(
+        CANAL_ESQUERDA
+    ))
+    {
+        return false;
+    }
 
-    sensor.setASTEP(ASTEP);
+    if(!configurarSensor(
+        sensorEsquerda
+    ))
+    {
+        return false;
+    }
 
 
     // --------------------------------------------------------
-    // GANHO
+    // Começa imediatamente a primeira aquisição
     // --------------------------------------------------------
 
-    sensor.setGain(
-        GANHO
-    );
+    if(!tca.selecionarCanal(
+        CANAL_DIREITA
+    ))
+    {
+        return false;
+    }
 
+    sensorDireita.startReading();
 
-    // --------------------------------------------------------
-    // LED INTERNO
-    // --------------------------------------------------------
-
-    sensor.enableLED(false);
+    lendoDireita = true;
 
 
     return true;
 }
 
 
-// ============================================================
-// BEGIN
-// ============================================================
-
-bool AS7341Sensores::begin()
+void AS7341Sensores::armazenarLeitura(
+    AS7341Data& destino,
+    uint16_t* readings
+)
 {
+    destino.F1 = readings[0];
+    destino.F2 = readings[1];
+    destino.F3 = readings[2];
+    destino.F4 = readings[3];
+
+    destino.F5 = readings[6];
+    destino.F6 = readings[7];
+    destino.F7 = readings[8];
+    destino.F8 = readings[9];
+
+    destino.clear = readings[10];
+    destino.nir = readings[11];
+
+    destino.valido = true;
+    destino.tempo = millis();
+}
+
+
+bool AS7341Sensores::update()
+{
+    uint16_t readings[12];
+
+    bool houveLeitura = false;
+
 
     // ========================================================
     // DIREITA
     // ========================================================
 
-    if(!tca.selecionarCanal(CANAL_DIREITA))
+    if(lendoDireita)
     {
-        return false;
-    }
+        if(!tca.selecionarCanal(
+            CANAL_DIREITA
+        ))
+        {
+            return houveLeitura;
+        }
 
 
-    if(!configurarSensor(sensorDireita))
-    {
-        return false;
+        if(
+            sensorDireita.checkReadingProgress()
+        )
+        {
+            sensorDireita.getAllChannels(
+                readings
+            );
+
+            armazenarLeitura(
+                dadosDireita,
+                readings
+            );
+
+            lendoDireita = false;
+
+            houveLeitura = true;
+        }
     }
 
 
@@ -96,160 +175,82 @@ bool AS7341Sensores::begin()
     // ESQUERDA
     // ========================================================
 
-    if(!tca.selecionarCanal(CANAL_ESQUERDA))
+    if(!lendoEsquerda)
     {
-        return false;
+        if(!tca.selecionarCanal(
+            CANAL_ESQUERDA
+        ))
+        {
+            return houveLeitura;
+        }
+
+        sensorEsquerda.startReading();
+
+        lendoEsquerda = true;
     }
 
 
-    if(!configurarSensor(sensorEsquerda))
+    if(lendoEsquerda)
     {
-        return false;
+        if(!tca.selecionarCanal(
+            CANAL_ESQUERDA
+        ))
+        {
+            return houveLeitura;
+        }
+
+
+        if(
+            sensorEsquerda.checkReadingProgress()
+        )
+        {
+            sensorEsquerda.getAllChannels(
+                readings
+            );
+
+            armazenarLeitura(
+                dadosEsquerda,
+                readings
+            );
+
+            lendoEsquerda = false;
+
+            houveLeitura = true;
+        }
     }
 
 
     // ========================================================
-    // DESLIGA TCA
+    // Se terminou os dois, começa novamente o direito
     // ========================================================
 
-    tca.desligarCanais();
+    if(
+        !lendoDireita &&
+        !lendoEsquerda
+    )
+    {
+        if(
+            tca.selecionarCanal(
+                CANAL_DIREITA
+            )
+        )
+        {
+            sensorDireita.startReading();
+
+            lendoDireita = true;
+        }
+    }
 
 
-    return true;
+    return houveLeitura;
 }
 
-
-// ============================================================
-// ARMAZENAR LEITURA
-// ============================================================
-
-void AS7341Sensores::armazenarLeitura(
-    AS7341Data& destino,
-    uint16_t* readings
-)
-{
-
-    // --------------------------------------------------------
-    // F1 - F4
-    // --------------------------------------------------------
-
-    destino.F1 = readings[0];
-    destino.F2 = readings[1];
-    destino.F3 = readings[2];
-    destino.F4 = readings[3];
-
-
-    // --------------------------------------------------------
-    // F5 - F8
-    //
-    // Os índices 4 e 5 são os Clear/NIR duplicados
-    // da primeira configuração SMUX.
-    //
-    // Os canais úteis F5-F8 estão em 6-9.
-    // --------------------------------------------------------
-
-    destino.F5 = readings[6];
-    destino.F6 = readings[7];
-    destino.F7 = readings[8];
-    destino.F8 = readings[9];
-
-
-    // --------------------------------------------------------
-    // CLEAR / NIR
-    // --------------------------------------------------------
-
-    destino.clear = readings[10];
-    destino.nir = readings[11];
-
-
-    // --------------------------------------------------------
-    // VALIDADE
-    // --------------------------------------------------------
-
-    destino.valido = true;
-
-    destino.tempo = millis();
-}
-
-
-// ============================================================
-// UPDATE
-// ============================================================
-
-bool AS7341Sensores::update()
-{
-
-    uint16_t readings[12];
-
-
-    // ========================================================
-    // SENSOR DIREITO
-    // ========================================================
-
-    if(!tca.selecionarCanal(CANAL_DIREITA))
-    {
-        return false;
-    }
-
-
-    if(!sensorDireita.readAllChannels(readings))
-    {
-        return false;
-    }
-
-
-    armazenarLeitura(
-        dadosDireita,
-        readings
-    );
-
-
-    // ========================================================
-    // SENSOR ESQUERDO
-    // ========================================================
-
-    if(!tca.selecionarCanal(CANAL_ESQUERDA))
-    {
-        return false;
-    }
-
-
-    if(!sensorEsquerda.readAllChannels(readings))
-    {
-        return false;
-    }
-
-
-    armazenarLeitura(
-        dadosEsquerda,
-        readings
-    );
-
-
-    // ========================================================
-    // DESLIGA TCA
-    // ========================================================
-
-    tca.desligarCanais();
-
-
-    return true;
-}
-
-
-// ============================================================
-// GET DIREITA
-// ============================================================
 
 AS7341Data AS7341Sensores::getDireita()
 {
     return dadosDireita;
 }
 
-
-// ============================================================
-// GET ESQUERDA
-// ============================================================
 
 AS7341Data AS7341Sensores::getEsquerda()
 {
