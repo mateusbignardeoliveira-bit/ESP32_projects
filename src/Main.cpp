@@ -26,9 +26,6 @@ const int PINO_BOTAO = 32;
 
 // ============================================================
 // ARRAY DE LINHA
-//
-// RX = 5
-// TX = 18
 // ============================================================
 
 ArrayLinha arrayLinha(
@@ -40,9 +37,6 @@ ArrayLinha arrayLinha(
 
 // ============================================================
 // CONTROLADOR DOS MOTORES
-//
-// RX = 16
-// TX = 17
 // ============================================================
 
 MotorControlador motores(
@@ -94,7 +88,7 @@ AS7341Analise analiseCor;
 PIDLinha pid(
     80.0f,
     0.0f,
-    20.0f
+    40.0f
 );
 
 
@@ -133,16 +127,16 @@ EstadoRoboControl estado;
 
 
 // ============================================================
-// VELOCIDADE DA CURVA
+// CONFIGURAÇÕES DAS CURVAS
 // ============================================================
 
 const int VELOCIDADE_CURVA =
     400;
 
 
-// ============================================================
+// ------------------------------------------------------------
 // CANCELAMENTO DE INÉRCIA
-// ============================================================
+// ------------------------------------------------------------
 
 const int VELOCIDADE_FREIO =
     -1000;
@@ -152,9 +146,9 @@ const unsigned long TEMPO_FREIO_CURVA =
     20;
 
 
-// ============================================================
+// ------------------------------------------------------------
 // PRÉ-CURVA
-// ============================================================
+// ------------------------------------------------------------
 
 const int VELOCIDADE_PRE_CURVA =
     60;
@@ -164,66 +158,39 @@ const unsigned long TEMPO_PRE_CURVA =
     180;
 
 
-// ============================================================
-// LIMIAR DE PRETO
-// ============================================================
-
-const float LIMIAR_PRETO_CURVA =
-    0.35f;
-
-
-// ============================================================
-// MÍNIMO DE PRETOS PARA CONFIRMAR CURVA
-// ============================================================
+// ------------------------------------------------------------
+// MÍNIMO DE PRETOS PARA CURVA
+// ------------------------------------------------------------
 
 const int MINIMO_PRETOS_CURVA =
     4;
 
 
-// ============================================================
-// MÍNIMO DE PRETOS PARA ENCONTRAR NOVA LINHA
-// ============================================================
+// ------------------------------------------------------------
+// TEMPO DO GIRO DE 90°
+// ------------------------------------------------------------
 
-const int MINIMO_PRETOS_NOVA_LINHA =
-    3;
-
-
-// ============================================================
-// LIMITE DE SEGURANÇA DA CURVA
-// ============================================================
-
-const unsigned long TEMPO_MAXIMO_CURVA =
-    700;
+const unsigned long TEMPO_CURVA_90_MS =
+    800;
 
 
-// ============================================================
-// AVANÇO APÓS ENCONTRAR NOVA LINHA
-// ============================================================
+// ------------------------------------------------------------
+// AVANÇO APÓS O GIRO
+//
+// Não usa sensores.
+//
+// O robô simplesmente avança reto durante esse tempo
+// para se posicionar sobre a nova linha.
+//
+// Depois disso o PID assume novamente.
+// ------------------------------------------------------------
+
+const int VELOCIDADE_ALINHAMENTO_CURVA =
+    400;
+
 
 const unsigned long TEMPO_ALINHAMENTO_CURVA =
     200;
-
-
-// ============================================================
-// AVANÇO APÓS VERDE QUE NÃO ERA CURVA
-// ============================================================
-//
-// Quando verde é detectado mas existem mais de 3 sensores
-// pretos:
-//
-//      NÃO faz curva
-//      NÃO continua indefinidamente
-//
-// O robô avança por este tempo e depois volta ao PID.
-//
-// ============================================================
-
-const int VELOCIDADE_POS_VERDE =
-    200;
-
-
-const unsigned long TEMPO_POS_VERDE =
-    400;
 
 
 // ============================================================
@@ -247,6 +214,14 @@ const int DISTANCIA_OBSTACULO_MM =
 
 
 // ============================================================
+// LIMIAR DE PRETO
+// ============================================================
+
+const float LIMIAR_PRETO_CURVA =
+    0.35f;
+
+
+// ============================================================
 // TEMPOS
 // ============================================================
 
@@ -263,18 +238,6 @@ unsigned long inicioCruzamento =
 
 
 unsigned long fimBloqueioCruzamento =
-    0;
-
-
-// ============================================================
-// CONTROLE INTERNO DO AVANÇO PÓS-VERDE
-// ============================================================
-
-bool avancandoPosVerde =
-    false;
-
-
-unsigned long inicioAvancoPosVerde =
     0;
 
 
@@ -404,16 +367,21 @@ void avancarPreCurva()
 
 
 // ============================================================
-// AVANÇO APÓS VERDE FALSO
+// AVANÇA RETO APÓS O GIRO
+//
+// Aqui NÃO usamos sensores.
+//
+// É apenas um avanço temporizado para colocar o robô
+// sobre a nova linha antes de devolver o controle ao PID.
 // ============================================================
 
-void avancarPosVerde()
+void avancarAlinhamentoCurva()
 {
     motores.setSpeed(
-        VELOCIDADE_POS_VERDE,
-        VELOCIDADE_POS_VERDE,
-        VELOCIDADE_POS_VERDE,
-        VELOCIDADE_POS_VERDE
+        VELOCIDADE_ALINHAMENTO_CURVA,
+        VELOCIDADE_ALINHAMENTO_CURVA,
+        VELOCIDADE_ALINHAMENTO_CURVA,
+        VELOCIDADE_ALINHAMENTO_CURVA
     );
 }
 
@@ -467,175 +435,6 @@ int quantidadeSensoresPretos(
 
 
     return quantidade;
-}
-
-
-// ============================================================
-// VERIFICA SE TODOS OS SENSORES ESTÃO BRANCOS
-// ============================================================
-
-bool arrayTodoBranco(
-    const LinhaData& dadosLinha
-)
-{
-    return (
-        quantidadeSensoresPretos(
-            dadosLinha
-        ) == 0
-    );
-}
-
-
-// ============================================================
-// VERIFICA SE EXISTE PRETO NA REGIÃO CENTRAL
-//
-// S3 S4 S5 S6
-// ============================================================
-
-bool pretoNaRegiaoCentral(
-    const LinhaData& dadosLinha
-)
-{
-    for(int i = 2; i <= 5; i++)
-    {
-        if(
-            dadosLinha.sensores[i] >=
-            LIMIAR_PRETO_CURVA
-        )
-        {
-            return true;
-        }
-    }
-
-
-    return false;
-}
-
-
-// ============================================================
-// VERIFICA CURVA FALSA
-//
-// Menos de 4 pretos.
-//
-// E todos os pretos estão somente em:
-//
-// S3 S4 S5 S6
-//
-// ============================================================
-
-bool curvaFalsa(
-    const LinhaData& dadosLinha
-)
-{
-    int quantidadePretos =
-        quantidadeSensoresPretos(
-            dadosLinha
-        );
-
-
-    if(
-        quantidadePretos >=
-        MINIMO_PRETOS_CURVA
-    )
-    {
-        return false;
-    }
-
-
-    if(
-        !pretoNaRegiaoCentral(
-            dadosLinha
-        )
-    )
-    {
-        return false;
-    }
-
-
-    for(int i = 0; i < 8; i++)
-    {
-        bool preto =
-            dadosLinha.sensores[i] >=
-            LIMIAR_PRETO_CURVA;
-
-
-        if(
-            preto &&
-            (i < 2 || i > 5)
-        )
-        {
-            return false;
-        }
-    }
-
-
-    return true;
-}
-
-
-// ============================================================
-// PROCURA NOVA LINHA À ESQUERDA
-//
-// S1 S2 S3 S4
-// ============================================================
-
-bool encontrouNovaLinhaEsquerda(
-    const LinhaData& dadosLinha
-)
-{
-    int quantidadePretos =
-        0;
-
-
-    for(int i = 0; i < 4; i++)
-    {
-        if(
-            dadosLinha.sensores[i] >=
-            LIMIAR_PRETO_CURVA
-        )
-        {
-            quantidadePretos++;
-        }
-    }
-
-
-    return (
-        quantidadePretos >=
-        MINIMO_PRETOS_NOVA_LINHA
-    );
-}
-
-
-// ============================================================
-// PROCURA NOVA LINHA À DIREITA
-//
-// S5 S6 S7 S8
-// ============================================================
-
-bool encontrouNovaLinhaDireita(
-    const LinhaData& dadosLinha
-)
-{
-    int quantidadePretos =
-        0;
-
-
-    for(int i = 4; i < 8; i++)
-    {
-        if(
-            dadosLinha.sensores[i] >=
-            LIMIAR_PRETO_CURVA
-        )
-        {
-            quantidadePretos++;
-        }
-    }
-
-
-    return (
-        quantidadePretos >=
-        MINIMO_PRETOS_NOVA_LINHA
-    );
 }
 
 
@@ -704,14 +503,6 @@ void reiniciarRobo()
 
 
     fimBloqueioCruzamento =
-        0;
-
-
-    avancandoPosVerde =
-        false;
-
-
-    inicioAvancoPosVerde =
         0;
 
 
@@ -841,10 +632,8 @@ void loop()
     {
         pararRobo();
 
-
         botaoAnterior =
             LOW;
-
 
         return;
     }
@@ -965,28 +754,6 @@ void loop()
     // ========================================================
     // VERDE
     // ========================================================
-    //
-    // IMPORTANTE:
-    //
-    // O Verde precisa ser atualizado SEMPRE quando o robô
-    // estiver seguindo linha.
-    //
-    // NÃO podemos bloquear o update quando existem mais
-    // de 3 pretos.
-    //
-    // O terceiro argumento informa a quantidade de pretos
-    // para o módulo Verde decidir:
-    //
-    // <= 3 pretos:
-    //     verde pode resultar em manobra.
-    //
-    // > 3 pretos:
-    //     verde não deve gerar curva.
-    //
-    // Neste segundo caso, fazemos um pequeno avanço e
-    // depois devolvemos o controle ao PID.
-    //
-    // ========================================================
 
     bool verdeEstavaExecutando =
         verde.estaExecutando();
@@ -1032,11 +799,6 @@ void loop()
             verde.finalizado()
         )
         {
-            // ------------------------------------------------
-            // Se o Verde executou uma manobra real,
-            // o comportamento continua sendo o anterior.
-            // ------------------------------------------------
-
             verde.reset();
 
 
@@ -1071,60 +833,6 @@ void loop()
 
     estadoAtual =
         estado.getEstado();
-
-
-    // ========================================================
-    // AVANÇO PÓS-VERDE
-    // ========================================================
-    //
-    // Este bloco é usado quando uma detecção de verde NÃO
-    // resultou em uma curva.
-    //
-    // O robô:
-    //
-    // 1. avança um pequeno trecho;
-    // 2. não usa PID durante esse pequeno trecho;
-    // 3. depois volta ao PID.
-    //
-    // ========================================================
-
-    if(
-        avancandoPosVerde
-    )
-    {
-        avancarPosVerde();
-
-
-        if(
-            millis() -
-            inicioAvancoPosVerde >=
-            TEMPO_POS_VERDE
-        )
-        {
-            avancandoPosVerde =
-                false;
-
-
-            estado.definirEstado(
-                ESTADO_SEGUINDO_LINHA
-            );
-
-
-            pid.reset();
-
-
-            tempoAnteriorPID =
-                micros();
-
-
-            direcao.update(
-                0.0f
-            );
-        }
-
-
-        return;
-    }
 
 
     // ========================================================
@@ -1168,16 +876,6 @@ void loop()
 
         // ====================================================
         // POSSÍVEL CURVA 90°
-        // ====================================================
-        //
-        // Só entra se houver pelo menos 4 sensores pretos.
-        //
-        // 3 ou menos:
-        //     não entra na rotina de curva.
-        //
-        // 4 ou mais:
-        //     pode entrar na pré-curva.
-        //
         // ====================================================
 
         if(
@@ -1351,116 +1049,75 @@ void loop()
         // ====================================================
         // FASE 1
         //
-        // AVANÇA DEVAGAR PARA CONFIRMAR
+        // PRÉ-CURVA
+        //
+        // Aqui ele apenas avança devagar.
         // ====================================================
 
         if(
-            faseCurva ==
-            CURVA_FASE_AVANCANDO
+    faseCurva ==
+    CURVA_FASE_AVANCANDO
+)
+{
+    // ====================================================
+    // PRIMEIRO: AVANÇA 180 ms
+    // ====================================================
+
+    if(
+        inicioFreioCurva == 0
+    )
+    {
+        avancarPreCurva();
+
+
+        if(
+            millis() - inicioPreCurva >=
+            TEMPO_PRE_CURVA
         )
         {
-            avancarPreCurva();
-
-
-            unsigned long tempoPreCurva =
-                millis() -
-                inicioPreCurva;
-
-
-            // ------------------------------------------------
-            // CURVA FALSA
-            //
-            // Menos de 4 pretos.
-            //
-            // E os pretos estão somente entre S3-S6.
-            //
-            // Volta imediatamente para o PID.
-            // ------------------------------------------------
-
-            if(
-                curvaFalsa(
-                    dadosLinha
-                )
-            )
-            {
-                estado.definirEstado(
-                    ESTADO_SEGUINDO_LINHA
-                );
-
-
-                resetControleCurva();
-
-
-                pid.reset();
-
-
-                tempoAnteriorPID =
-                    micros();
-
-
-                return;
-            }
-
-
-            // ------------------------------------------------
-            // TODOS BRANCOS
-            //
-            // A linha desapareceu completamente.
-            //
-            // Curva real confirmada.
-            // ------------------------------------------------
-
-            if(
-                arrayTodoBranco(
-                    dadosLinha
-                )
-            )
-            {
-                faseCurva =
-                    CURVA_FASE_FREANDO;
-
-
-                inicioFreioCurva =
-                    millis();
-
-
-                cancelarInercia();
-
-
-                return;
-            }
-
-
-            // ------------------------------------------------
-            // SEGURANÇA DA PRÉ-CURVA
-            // ------------------------------------------------
-
-            if(
-                tempoPreCurva >=
-                TEMPO_PRE_CURVA
-            )
-            {
-                estado.definirEstado(
-                    ESTADO_SEGUINDO_LINHA
-                );
-
-
-                resetControleCurva();
-
-
-                pid.reset();
-
-
-                tempoAnteriorPID =
-                    micros();
-
-
-                return;
-            }
-
-
-            return;
+            // Começa a contar o recuo
+            inicioFreioCurva =
+                millis();
         }
+
+
+        return;
+    }
+
+
+    // ====================================================
+    // SEGUNDO: RECUA 180 ms
+    // ====================================================
+
+    cancelarInercia();
+    delay(TEMPO_FREIO_CURVA);
+
+    motores.setSpeed(
+        -VELOCIDADE_PRE_CURVA,
+        -VELOCIDADE_PRE_CURVA,
+        -VELOCIDADE_PRE_CURVA,
+        -VELOCIDADE_PRE_CURVA
+    );
+
+
+    if(
+        millis() - inicioFreioCurva >= 20
+    )
+    {
+        faseCurva =
+            CURVA_FASE_FREANDO;
+
+
+        inicioFreioCurva =
+            millis();
+
+
+        cancelarInercia();
+    }
+
+
+    return;
+}
 
 
         // ====================================================
@@ -1500,6 +1157,12 @@ void loop()
         // FASE 3
         //
         // GIRO NO PRÓPRIO EIXO
+        //
+        // IMPORTANTE:
+        //
+        // NÃO procuramos mais a nova linha pelos sensores.
+        //
+        // O giro termina exclusivamente pelo tempo.
         // ====================================================
 
         if(
@@ -1511,40 +1174,8 @@ void loop()
                 millis() -
                 inicioGiroCurva;
 
-
             // ------------------------------------------------
-            // LIMITE DE SEGURANÇA
-            // ------------------------------------------------
-
-            if(
-                tempoGiro >=
-                TEMPO_MAXIMO_CURVA
-            )
-            {
-                pararRobo();
-
-
-                estado.definirEstado(
-                    ESTADO_SEGUINDO_LINHA
-                );
-
-
-                resetControleCurva();
-
-
-                pid.reset();
-
-
-                tempoAnteriorPID =
-                    micros();
-
-
-                return;
-            }
-
-
-            // ------------------------------------------------
-            // CURVA ESQUERDA
+            // GIRO ESQUERDA
             // ------------------------------------------------
 
             if(
@@ -1552,41 +1183,30 @@ void loop()
             )
             {
                 girarEsquerda();
-
-
-                if(
-                    encontrouNovaLinhaEsquerda(
-                        dadosLinha
-                    )
-                )
-                {
-                    faseCurva =
-                        CURVA_FASE_ALINHANDO;
-
-
-                    inicioAlinhamentoCurva =
-                        millis();
-
-
-                    return;
-                }
-
-
-                return;
             }
 
 
             // ------------------------------------------------
-            // CURVA DIREITA
+            // GIRO DIREITA
             // ------------------------------------------------
 
-            girarDireita();
+            else
+            {
+                girarDireita();
+            }
 
+
+            // ------------------------------------------------
+            // TERMINOU O TEMPO DO GIRO
+            //
+            // Agora NÃO verificamos sensor.
+            //
+            // Entramos diretamente no avanço temporizado.
+            // ------------------------------------------------
 
             if(
-                encontrouNovaLinhaDireita(
-                    dadosLinha
-                )
+                tempoGiro >=
+                TEMPO_CURVA_90_MS
             )
             {
                 faseCurva =
@@ -1595,9 +1215,6 @@ void loop()
 
                 inicioAlinhamentoCurva =
                     millis();
-
-
-                return;
             }
 
 
@@ -1608,7 +1225,13 @@ void loop()
         // ====================================================
         // FASE 4
         //
-        // PEQUENO AVANÇO APÓS ENCONTRAR NOVA LINHA
+        // AVANÇO RETO TEMPORIZADO
+        //
+        // Não procura nova linha.
+        // Não usa PID.
+        // Não usa os sensores para decidir quando parar.
+        //
+        // Apenas avança 200 ms.
         // ====================================================
 
         if(
@@ -1616,7 +1239,7 @@ void loop()
             CURVA_FASE_ALINHANDO
         )
         {
-            avancarReto();
+            avancarAlinhamentoCurva();
 
 
             if(

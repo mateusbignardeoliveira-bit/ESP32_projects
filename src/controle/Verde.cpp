@@ -74,7 +74,7 @@ namespace
     // --------------------------------------------------------
 
     constexpr unsigned long TEMPO_CURVA_90_MS =
-        800;
+        700;
 
 
     // --------------------------------------------------------
@@ -82,13 +82,13 @@ namespace
     // --------------------------------------------------------
 
     constexpr unsigned long TEMPO_MEIA_VOLTA_MS =
-        1350;
+        1400;
 
 
     // --------------------------------------------------------
     // QUANTIDADE DE LEITURAS SEM VERDE
     //
-    // O verde precisa desaparecer por 40 leituras consecutivas
+    // O verde precisa desaparecer por 35 leituras consecutivas
     // para considerarmos que o robô saiu da região verde.
     // --------------------------------------------------------
 
@@ -109,7 +109,7 @@ namespace
     // --------------------------------------------------------
 
     constexpr int MINIMO_PRETOS_LINHA =
-        4;
+        6;
 }
 
 
