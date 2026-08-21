@@ -471,35 +471,54 @@ void loop()
     }
 
 
-    // ========================================================
-    // AS7341
-    //
-    // O módulo Verde usa essas leituras.
-    //
-    // Ele só assume o controle dos motores quando detecta
-    // verde ou enquanto executa a manobra correspondente.
-    // ========================================================
+   // ========================================================
+// ESTADO ATUAL
+// ========================================================
 
-    AS7341Data dadosEsquerda =
-        sensoresCor.getEsquerda();
-
-    AS7341Data dadosDireita =
-        sensoresCor.getDireita();
+EstadoRobo estadoAtual =
+    estado.getEstado();
 
 
+// ========================================================
+// AS7341
+// ========================================================
+
+AS7341Data dadosEsquerda =
+    sensoresCor.getEsquerda();
+
+AS7341Data dadosDireita =
+    sensoresCor.getDireita();
+
+
+// ========================================================
+// VERDE
+//
+// O Verde só pode assumir o controle dos motores enquanto
+// estamos seguindo linha.
+//
+// Se já estiver executando uma manobra de verde, continua
+// sendo atualizado.
+//
+// Durante CURVA ou CRUZAMENTO, o Verde fica completamente
+// fora do controle dos motores.
+// ========================================================
+
+if(
+    estadoAtual ==
+    ESTADO_SEGUINDO_LINHA ||
+    verde.estaExecutando() ||
+    verde.finalizado()
+)
+{
     verde.update(
         dadosEsquerda,
         dadosDireita
     );
 
 
-    // ========================================================
+    // ----------------------------------------------------
     // VERDE EM EXECUÇÃO
-    //
-    // Enquanto o módulo Verde estiver trabalhando,
-    // não deixamos PID / curva / cruzamento sobrescrever
-    // os motores.
-    // ========================================================
+    // ----------------------------------------------------
 
     if(
         verde.estaExecutando()
@@ -509,12 +528,9 @@ void loop()
     }
 
 
-    // ========================================================
-    // VERDE FINALIZADO
-    //
-    // A manobra terminou.
-    // Retorna ao segue-linha.
-    // ========================================================
+    // ----------------------------------------------------
+    // VERDE TERMINOU
+    // ----------------------------------------------------
 
     if(
         verde.finalizado()
@@ -537,8 +553,10 @@ void loop()
         fimBloqueioCruzamento =
             millis() +
             BLOQUEIO_CRUZAMENTO;
-    }
 
+        return;
+    }
+}
 
     // ========================================================
     // ARRAY
@@ -575,14 +593,6 @@ void loop()
 
     CurvaData dadosCurva =
         curva.getData();
-
-
-    // ========================================================
-    // ESTADO ATUAL
-    // ========================================================
-
-    EstadoRobo estadoAtual =
-        estado.getEstado();
 
 
     // ========================================================
