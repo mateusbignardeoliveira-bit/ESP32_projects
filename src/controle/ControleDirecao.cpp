@@ -6,95 +6,196 @@ ControleDirecao::ControleDirecao(
     int maxima
 )
 {
-    velocidadeBase = base;
-    velocidadeMaxima = maxima;
+    velocidadeBase =
+        base;
 
-    resultado.m1 = 0;
-    resultado.m2 = 0;
-    resultado.m3 = 0;
-    resultado.m4 = 0;
+
+    velocidadeMaxima =
+        maxima;
+
+
+    resultado.m1 =
+        0;
+
+
+    resultado.m2 =
+        0;
+
+
+    resultado.m3 =
+        0;
+
+
+    resultado.m4 =
+        0;
 }
 
+
+// ============================================================
+// VELOCIDADE BASE
+// ============================================================
 
 void ControleDirecao::setVelocidadeBase(
     int velocidade
 )
 {
-    velocidadeBase = velocidade;
+    velocidadeBase =
+        velocidade;
 }
 
+
+// ============================================================
+// VELOCIDADE MÁXIMA
+// ============================================================
 
 void ControleDirecao::setVelocidadeMaxima(
     int velocidade
 )
 {
-    velocidadeMaxima = velocidade;
+    if(
+        velocidade < 0
+    )
+    {
+        velocidade =
+            -velocidade;
+    }
+
+
+    velocidadeMaxima =
+        velocidade;
 }
 
+
+// ============================================================
+// UPDATE
+// ============================================================
 
 void ControleDirecao::update(
     float correcao
 )
 {
-    // Linha à direita:
-    // correção positiva
+    // ========================================================
+    // CORREÇÃO POSITIVA
     //
-    // Para virar para a direita:
-    // esquerda aumenta
-    // direita diminui
+    // Linha à direita.
+    //
+    // Robô precisa virar para a direita.
+    //
+    // Esquerda -> acelera
+    // Direita  -> desacelera / pode inverter
+    // ========================================================
+
 
     float esquerda =
-        velocidadeBase + correcao;
+        velocidadeBase +
+        correcao;
+
 
     float direita =
-        velocidadeBase - correcao;
+        velocidadeBase -
+        correcao;
 
 
-    // Limita a velocidade esquerda
+    // ========================================================
+    // LIMITAÇÃO
+    //
+    // IMPORTANTE:
+    //
+    // Pode chegar a -velocidadeMaxima.
+    //
+    // Portanto o robô pode realmente inverter uma roda.
+    // ========================================================
 
-    if(esquerda > velocidadeMaxima)
+    if(
+        esquerda >
+        velocidadeMaxima
+    )
     {
-        esquerda = velocidadeMaxima;
-    }
-
-    if(esquerda < -velocidadeMaxima)
-    {
-        esquerda = -velocidadeMaxima;
-    }
-
-
-    // Limita a velocidade direita
-
-    if(direita > velocidadeMaxima)
-    {
-        direita = velocidadeMaxima;
-    }
-
-    if(direita < -velocidadeMaxima)
-    {
-        direita = -velocidadeMaxima;
+        esquerda =
+            velocidadeMaxima;
     }
 
 
-    // M1 e M2 = esquerda
-    // M3 e M4 = direita
+    if(
+        esquerda <
+        -velocidadeMaxima
+    )
+    {
+        esquerda =
+            -velocidadeMaxima;
+    }
 
-    resultado.m1 = (int)esquerda;
-    resultado.m2 = (int)esquerda;
 
-    resultado.m3 = (int)direita;
-    resultado.m4 = (int)direita;
+    if(
+        direita >
+        velocidadeMaxima
+    )
+    {
+        direita =
+            velocidadeMaxima;
+    }
+
+
+    if(
+        direita <
+        -velocidadeMaxima
+    )
+    {
+        direita =
+            -velocidadeMaxima;
+    }
+
+
+    // ========================================================
+    // MOTORES
+    //
+    // M1 + M2 = esquerda
+    // M3 + M4 = direita
+    // ========================================================
+
+    resultado.m1 =
+        (int)esquerda;
+
+
+    resultado.m2 =
+        (int)esquerda;
+
+
+    resultado.m3 =
+        (int)direita;
+
+
+    resultado.m4 =
+        (int)direita;
 }
 
+
+// ============================================================
+// PARAR
+// ============================================================
 
 void ControleDirecao::parar()
 {
-    resultado.m1 = 0;
-    resultado.m2 = 0;
-    resultado.m3 = 0;
-    resultado.m4 = 0;
+    resultado.m1 =
+        0;
+
+
+    resultado.m2 =
+        0;
+
+
+    resultado.m3 =
+        0;
+
+
+    resultado.m4 =
+        0;
 }
 
+
+// ============================================================
+// GET
+// ============================================================
 
 MotoresData ControleDirecao::getData()
 {

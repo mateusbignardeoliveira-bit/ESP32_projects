@@ -22,14 +22,15 @@ private:
 
     int velocidadeMaxima;
 
+
     MotoresData resultado;
 
 
 public:
 
     ControleDirecao(
-        int base = 500,
-        int maxima = 1000
+        int base = 200,
+        int maxima = 400
     );
 
 
@@ -54,6 +55,5 @@ public:
     MotoresData getData();
 
 };
-
 
 #endif

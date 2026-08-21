@@ -94,7 +94,7 @@ AS7341Analise analiseCor;
 PIDLinha pid(
     80.0f,
     0.0f,
-    30.0f
+    20.0f
 );
 
 
@@ -193,7 +193,7 @@ const int MINIMO_PRETOS_NOVA_LINHA =
 // ============================================================
 
 const unsigned long TEMPO_MAXIMO_CURVA =
-    900;
+    700;
 
 
 // ============================================================

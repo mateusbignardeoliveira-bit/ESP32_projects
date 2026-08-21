@@ -33,9 +33,15 @@ private:
     float integral;
 
 
+    float derivadaFiltrada;
+
+
     float limiteIntegral;
 
     float limiteCorrecao;
+
+
+    float fatorFiltroDerivativo;
 
 
     PIDData resultado;
@@ -71,6 +77,16 @@ public:
 
     void setLimiteCorrecao(
         float limite
+    );
+
+
+    void setLimiteIntegral(
+        float limite
+    );
+
+
+    void setFiltroDerivativo(
+        float fator
     );
 
 };

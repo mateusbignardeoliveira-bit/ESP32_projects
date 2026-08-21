@@ -1,142 +1,241 @@
 #include "PIDLinha.h"
 
 
-
 PIDLinha::PIDLinha(
     float kp,
     float ki,
     float kd
 )
 {
-
     Kp = kp;
-
     Ki = ki;
-
     Kd = kd;
 
 
-    erroAnterior = 0.0f;
-
-    integral = 0.0f;
-
-
-    limiteIntegral = 100.0f;
-
-    limiteCorrecao = 500.0f;
+    erroAnterior =
+        0.0f;
 
 
-    resultado.erro = 0.0f;
+    integral =
+        0.0f;
 
-    resultado.proporcional = 0.0f;
 
-    resultado.derivativo = 0.0f;
+    derivadaFiltrada =
+        0.0f;
 
-    resultado.integral = 0.0f;
 
-    resultado.correcao = 0.0f;
+    // --------------------------------------------------------
+    // Limite da integral
+    // --------------------------------------------------------
 
+    limiteIntegral =
+        2.0f;
+
+
+    // --------------------------------------------------------
+    // Agora permitimos uma correção muito maior.
+    //
+    // Com base = 200:
+    //
+    // +800 -> esquerda +1000 / direita -600
+    //        depois limitado pelo ControleDirecao
+    //
+    // Na prática o ControleDirecao transforma isso em
+    // uma curva extremamente agressiva.
+    // --------------------------------------------------------
+
+    limiteCorrecao =
+        800.0f;
+
+
+    // --------------------------------------------------------
+    // Filtro da derivada
+    //
+    // 0.20 = bastante filtragem
+    // 1.00 = sem filtragem
+    // --------------------------------------------------------
+
+    fatorFiltroDerivativo =
+        0.20f;
+
+
+    resultado.erro =
+        0.0f;
+
+
+    resultado.proporcional =
+        0.0f;
+
+
+    resultado.derivativo =
+        0.0f;
+
+
+    resultado.integral =
+        0.0f;
+
+
+    resultado.correcao =
+        0.0f;
 }
 
 
-
+// ============================================================
+// RESET
+// ============================================================
 
 void PIDLinha::reset()
 {
-
-    erroAnterior = 0.0f;
-
-    integral = 0.0f;
+    erroAnterior =
+        0.0f;
 
 
-    resultado.erro = 0.0f;
+    integral =
+        0.0f;
 
-    resultado.proporcional = 0.0f;
 
-    resultado.derivativo = 0.0f;
+    derivadaFiltrada =
+        0.0f;
 
-    resultado.integral = 0.0f;
 
-    resultado.correcao = 0.0f;
+    resultado.erro =
+        0.0f;
 
+
+    resultado.proporcional =
+        0.0f;
+
+
+    resultado.derivativo =
+        0.0f;
+
+
+    resultado.integral =
+        0.0f;
+
+
+    resultado.correcao =
+        0.0f;
 }
 
 
-
+// ============================================================
+// UPDATE
+// ============================================================
 
 void PIDLinha::update(
     float erro,
     float deltaTime
 )
 {
+    // --------------------------------------------------------
+    // Proteção contra delta inválido
+    // --------------------------------------------------------
 
-    // Evita divisão por zero
-
-    if(deltaTime <= 0.0f)
+    if(
+        deltaTime <= 0.0001f
+    )
     {
-        deltaTime = 0.001f;
+        deltaTime =
+            0.001f;
     }
 
 
+    // --------------------------------------------------------
+    // Guarda erro
+    // --------------------------------------------------------
 
-    resultado.erro = erro;
+    resultado.erro =
+        erro;
 
 
-
-    // =====================================================
-    // TERMO PROPORCIONAL
-    // =====================================================
+    // ========================================================
+    // P
+    // ========================================================
 
     float proporcional =
-        Kp * erro;
+        Kp *
+        erro;
 
 
-
-    // =====================================================
-    // TERMO INTEGRAL
-    // =====================================================
+    // ========================================================
+    // I
+    // ========================================================
 
     integral +=
-        erro * deltaTime;
+        erro *
+        deltaTime;
 
 
+    // --------------------------------------------------------
+    // Anti-windup
+    // --------------------------------------------------------
 
-    // Limita o acúmulo da integral
-
-    if(integral > limiteIntegral)
+    if(
+        integral >
+        limiteIntegral
+    )
     {
-        integral = limiteIntegral;
+        integral =
+            limiteIntegral;
     }
 
 
-    if(integral < -limiteIntegral)
+    if(
+        integral <
+        -limiteIntegral
+    )
     {
-        integral = -limiteIntegral;
+        integral =
+            -limiteIntegral;
     }
 
 
     float termoIntegral =
-        Ki * integral;
+        Ki *
+        integral;
 
 
-
-    // =====================================================
-    // TERMO DERIVATIVO
-    // =====================================================
+    // ========================================================
+    // D
+    // ========================================================
 
     float derivada =
-        (erro - erroAnterior) /
+        (
+            erro -
+            erroAnterior
+        )
+        /
         deltaTime;
 
 
+    // --------------------------------------------------------
+    // Filtro passa-baixa da derivada
+    //
+    // Evita que pequenas oscilações dos sensores provoquem
+    // correções violentas.
+    // --------------------------------------------------------
+
+    derivadaFiltrada =
+        (
+            fatorFiltroDerivativo *
+            derivada
+        )
+        +
+        (
+            (1.0f - fatorFiltroDerivativo) *
+            derivadaFiltrada
+        );
+
+
     float termoDerivativo =
-        Kd * derivada;
+        Kd *
+        derivadaFiltrada;
 
 
-
-    // =====================================================
-    // CORREÇÃO FINAL
-    // =====================================================
+    // ========================================================
+    // PID TOTAL
+    // ========================================================
 
     float correcao =
         proporcional +
@@ -144,23 +243,33 @@ void PIDLinha::update(
         termoDerivativo;
 
 
+    // ========================================================
+    // SATURAÇÃO FINAL
+    // ========================================================
 
-    // Limita a correção
-
-    if(correcao > limiteCorrecao)
+    if(
+        correcao >
+        limiteCorrecao
+    )
     {
-        correcao = limiteCorrecao;
+        correcao =
+            limiteCorrecao;
     }
 
 
-    if(correcao < -limiteCorrecao)
+    if(
+        correcao <
+        -limiteCorrecao
+    )
     {
-        correcao = -limiteCorrecao;
+        correcao =
+            -limiteCorrecao;
     }
 
 
-
-    // Guarda os valores
+    // ========================================================
+    // RESULTADOS
+    // ========================================================
 
     resultado.proporcional =
         proporcional;
@@ -178,26 +287,28 @@ void PIDLinha::update(
         correcao;
 
 
+    // ========================================================
+    // MEMÓRIA
+    // ========================================================
 
-    // Guarda o erro atual
-    // para a próxima iteração
-
-    erroAnterior = erro;
-
+    erroAnterior =
+        erro;
 }
 
 
-
+// ============================================================
+// GET DATA
+// ============================================================
 
 PIDData PIDLinha::getData()
 {
-
     return resultado;
-
 }
 
 
-
+// ============================================================
+// GANHOS
+// ============================================================
 
 void PIDLinha::setGanho(
     float kp,
@@ -205,23 +316,89 @@ void PIDLinha::setGanho(
     float kd
 )
 {
+    Kp =
+        kp;
 
-    Kp = kp;
 
-    Ki = ki;
+    Ki =
+        ki;
 
-    Kd = kd;
 
+    Kd =
+        kd;
 }
 
 
-
+// ============================================================
+// LIMITE DA CORREÇÃO
+// ============================================================
 
 void PIDLinha::setLimiteCorrecao(
     float limite
 )
 {
+    if(
+        limite < 0.0f
+    )
+    {
+        limite =
+            -limite;
+    }
 
-    limiteCorrecao = limite;
 
+    limiteCorrecao =
+        limite;
+}
+
+
+// ============================================================
+// LIMITE DA INTEGRAL
+// ============================================================
+
+void PIDLinha::setLimiteIntegral(
+    float limite
+)
+{
+    if(
+        limite < 0.0f
+    )
+    {
+        limite =
+            -limite;
+    }
+
+
+    limiteIntegral =
+        limite;
+}
+
+
+// ============================================================
+// FILTRO DA DERIVADA
+// ============================================================
+
+void PIDLinha::setFiltroDerivativo(
+    float fator
+)
+{
+    if(
+        fator < 0.0f
+    )
+    {
+        fator =
+            0.0f;
+    }
+
+
+    if(
+        fator > 1.0f
+    )
+    {
+        fator =
+            1.0f;
+    }
+
+
+    fatorFiltroDerivativo =
+        fator;
 }
