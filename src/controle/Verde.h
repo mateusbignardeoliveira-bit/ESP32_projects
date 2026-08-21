@@ -37,7 +37,8 @@ public:
 
     void update(
         const AS7341Data& dadosEsquerda,
-        const AS7341Data& dadosDireita
+        const AS7341Data& dadosDireita,
+        int quantidadePretos
     );
 
 

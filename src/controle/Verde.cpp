@@ -28,15 +28,25 @@ namespace
         350;
 
 
-    // --------------------------------------------------------
-    // DEIXADO GRANDE POR ENQUANTO, COMO NO TESTE
-    // --------------------------------------------------------
-
     constexpr unsigned long TEMPO_MEIA_VOLTA_MS =
         10000000UL;
 
 
     constexpr int LEITURAS_SEM_VERDE_NECESSARIAS =
+        3;
+
+
+    // --------------------------------------------------------
+    // LIMITE DE PRETOS
+    //
+    // 4 ou mais:
+    //     não executa curva.
+    //
+    // 3 ou menos:
+    //     executa a manobra do verde.
+    // --------------------------------------------------------
+
+    constexpr int MAX_PRETOS_SEM_CURVA =
         3;
 }
 
@@ -125,8 +135,8 @@ void Verde::curvaEsquerda()
     motores.setSpeed(
         -VELOCIDADE_CURVA,
         -VELOCIDADE_CURVA,
-        VELOCIDADE_CURVA,
-        VELOCIDADE_CURVA
+         VELOCIDADE_CURVA,
+         VELOCIDADE_CURVA
     );
 }
 
@@ -138,8 +148,8 @@ void Verde::curvaEsquerda()
 void Verde::curvaDireita()
 {
     motores.setSpeed(
-        VELOCIDADE_CURVA,
-        VELOCIDADE_CURVA,
+         VELOCIDADE_CURVA,
+         VELOCIDADE_CURVA,
         -VELOCIDADE_CURVA,
         -VELOCIDADE_CURVA
     );
@@ -153,8 +163,8 @@ void Verde::curvaDireita()
 void Verde::meiaVolta()
 {
     motores.setSpeed(
-        VELOCIDADE_CURVA,
-        VELOCIDADE_CURVA,
+         VELOCIDADE_CURVA,
+         VELOCIDADE_CURVA,
         -VELOCIDADE_CURVA,
         -VELOCIDADE_CURVA
     );
@@ -168,7 +178,7 @@ void Verde::meiaVolta()
 void Verde::iniciarCurvaEsquerda()
 {
     Serial.println(
-        "CURVA ESQUERDA"
+        "CURVA VERDE ESQUERDA"
     );
 
     tempoInicio =
@@ -186,7 +196,7 @@ void Verde::iniciarCurvaEsquerda()
 void Verde::iniciarCurvaDireita()
 {
     Serial.println(
-        "CURVA DIREITA"
+        "CURVA VERDE DIREITA"
     );
 
     tempoInicio =
@@ -204,7 +214,7 @@ void Verde::iniciarCurvaDireita()
 void Verde::iniciarMeiaVolta()
 {
     Serial.println(
-        "MEIA VOLTA"
+        "MEIA VOLTA VERDE"
     );
 
     tempoInicio =
@@ -234,7 +244,8 @@ void Verde::finalizar()
 
 void Verde::update(
     const AS7341Data& dadosEsquerda,
-    const AS7341Data& dadosDireita
+    const AS7341Data& dadosDireita,
+    int quantidadePretos
 )
 {
     // ========================================================
@@ -262,10 +273,6 @@ void Verde::update(
         NORMAL
     )
     {
-        // ----------------------------------------------------
-        // DETECTOU VERDE
-        // ----------------------------------------------------
-
         if(
             esquerda.verdeDetectado ||
             direita.verdeDetectado
@@ -275,10 +282,6 @@ void Verde::update(
                 "VERDE DETECTADO"
             );
 
-
-            // -----------------------------------------------
-            // GUARDA O LADO
-            // -----------------------------------------------
 
             if(
                 esquerda.verdeDetectado
@@ -298,10 +301,6 @@ void Verde::update(
             }
 
 
-            // -----------------------------------------------
-            // FREIA
-            // -----------------------------------------------
-
             frear();
 
             tempoInicio =
@@ -313,10 +312,6 @@ void Verde::update(
             return;
         }
 
-
-        // ----------------------------------------------------
-        // MOVIMENTO NORMAL
-        // ----------------------------------------------------
 
         andarNormal();
 
@@ -343,7 +338,7 @@ void Verde::update(
         )
         {
             Serial.println(
-                "FREIO TERMINADO"
+                "FREIO VERDE TERMINADO"
             );
 
 
@@ -372,16 +367,8 @@ void Verde::update(
         AVANCANDO
     )
     {
-        // ----------------------------------------------------
-        // AVANÇA DEVAGAR
-        // ----------------------------------------------------
-
         andarDevagar();
 
-
-        // ----------------------------------------------------
-        // GUARDA VERDE ESQUERDO
-        // ----------------------------------------------------
 
         if(
             esquerda.verdeDetectado
@@ -391,10 +378,6 @@ void Verde::update(
                 true;
         }
 
-
-        // ----------------------------------------------------
-        // GUARDA VERDE DIREITO
-        // ----------------------------------------------------
 
         if(
             direita.verdeDetectado
@@ -406,7 +389,7 @@ void Verde::update(
 
 
         // ----------------------------------------------------
-        // VERIFICA SE AINDA ESTÁ NO VERDE
+        // AINDA ESTÁ NO VERDE
         // ----------------------------------------------------
 
         if(
@@ -417,6 +400,12 @@ void Verde::update(
             leiturasSemVerde =
                 0;
         }
+
+
+        // ----------------------------------------------------
+        // NÃO ESTÁ MAIS NO VERDE
+        // ----------------------------------------------------
+
         else
         {
             leiturasSemVerde++;
@@ -427,15 +416,20 @@ void Verde::update(
                 LEITURAS_SEM_VERDE_NECESSARIAS
             )
             {
-                // -------------------------------------------
-                // SAIU DO VERDE
-                // -------------------------------------------
-
                 parar();
 
 
                 Serial.println(
                     "SAIU DO VERDE"
+                );
+
+
+                Serial.print(
+                    "Pretos no array: "
+                );
+
+                Serial.println(
+                    quantidadePretos
                 );
 
 
@@ -457,9 +451,36 @@ void Verde::update(
                 );
 
 
-                // -------------------------------------------
-                // ESQUERDA
-                // -------------------------------------------
+                // =================================================
+                // EXISTE LINHA SUFICIENTE
+                //
+                // 4 OU MAIS PRETOS
+                //
+                // Portanto não é uma saída de verde que
+                // deve gerar curva.
+                // =================================================
+
+                if(
+                    quantidadePretos >
+                    MAX_PRETOS_SEM_CURVA
+                )
+                {
+                    Serial.println(
+                        "LINHA PRESENTE - NAO FAZ CURVA"
+                    );
+
+
+                    finalizar();
+
+                    return;
+                }
+
+
+                // =================================================
+                // 3 OU MENOS PRETOS
+                //
+                // Executa a manobra do verde.
+                // =================================================
 
                 if(
                     verdeEsquerda &&
@@ -472,10 +493,6 @@ void Verde::update(
                 }
 
 
-                // -------------------------------------------
-                // DIREITA
-                // -------------------------------------------
-
                 if(
                     verdeDireita &&
                     !verdeEsquerda
@@ -486,10 +503,6 @@ void Verde::update(
                     return;
                 }
 
-
-                // -------------------------------------------
-                // DOIS LADOS
-                // -------------------------------------------
 
                 if(
                     verdeEsquerda &&
@@ -502,13 +515,10 @@ void Verde::update(
                 }
 
 
-                // -------------------------------------------
-                // NENHUM
-                // -------------------------------------------
-
                 Serial.println(
                     "NENHUM VERDE - ERRO"
                 );
+
 
                 finalizar();
             }
@@ -539,8 +549,9 @@ void Verde::update(
         {
             parar();
 
+
             Serial.println(
-                "CURVA ESQUERDA TERMINADA"
+                "CURVA VERDE ESQUERDA TERMINADA"
             );
 
 
@@ -573,8 +584,9 @@ void Verde::update(
         {
             parar();
 
+
             Serial.println(
-                "CURVA DIREITA TERMINADA"
+                "CURVA VERDE DIREITA TERMINADA"
             );
 
 
@@ -607,8 +619,9 @@ void Verde::update(
         {
             parar();
 
+
             Serial.println(
-                "MEIA VOLTA TERMINADA"
+                "MEIA VOLTA VERDE TERMINADA"
             );
 
 
