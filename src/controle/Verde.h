@@ -19,6 +19,8 @@ public:
 
         AVANCANDO,
 
+        AVANCO_LINHA,
+
         CURVA_ESQUERDA,
 
         CURVA_DIREITA,
@@ -75,17 +77,30 @@ private:
     bool verdeDireita;
 
 
+    // ========================================================
+    // MAIOR QUANTIDADE DE PRETOS VISTA DURANTE O AVANÇO
+    // ========================================================
+
+    int maiorQuantidadePretos;
+
+
     unsigned long tempoInicio;
 
 
     int leiturasSemVerde;
 
 
+    // ========================================================
+    // FUNÇÕES DE MOVIMENTO
+    // ========================================================
+
     void parar();
 
     void andarNormal();
 
     void andarDevagar();
+
+    void andarReto();
 
     void frear();
 
@@ -95,11 +110,23 @@ private:
 
     void meiaVolta();
 
+
+    // ========================================================
+    // INÍCIO DAS MANOBRAS
+    // ========================================================
+
+    void iniciarAvancoLinha();
+
     void iniciarCurvaEsquerda();
 
     void iniciarCurvaDireita();
 
     void iniciarMeiaVolta();
+
+
+    // ========================================================
+    // FINALIZA
+    // ========================================================
 
     void finalizar();
 };

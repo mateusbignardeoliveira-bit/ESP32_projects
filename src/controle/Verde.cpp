@@ -7,47 +7,109 @@
 
 namespace
 {
+    // --------------------------------------------------------
+    // VELOCIDADE NORMAL
+    // --------------------------------------------------------
+
     constexpr int VELOCIDADE_ROBO =
         400;
 
+
+    // --------------------------------------------------------
+    // VELOCIDADE DURANTE A BUSCA DO VERDE
+    //
+    // O robô anda devagar enquanto continua fazendo
+    // medições dos sensores de cor e do array.
+    // --------------------------------------------------------
+
     constexpr int VELOCIDADE_VERDE =
         60;
+
+
+    // --------------------------------------------------------
+    // VELOCIDADE DO AVANÇO APÓS DETECTAR LINHA
+    //
+    // Se durante a busca do verde forem encontrados
+    // 4 ou mais pretos, o robô vem para cá.
+    // --------------------------------------------------------
+
+    constexpr int VELOCIDADE_AVANCO_LINHA =
+        400;
+
+
+    // --------------------------------------------------------
+    // TEMPO DO AVANÇO APÓS DETECTAR LINHA
+    //
+    // Este é o "pequeno avanço" que você queria.
+    //
+    // 300 ms
+    // --------------------------------------------------------
+
+    constexpr unsigned long TEMPO_AVANCO_LINHA_MS =
+        300;
+
+
+    // --------------------------------------------------------
+    // VELOCIDADE DA CURVA
+    // --------------------------------------------------------
 
     constexpr int VELOCIDADE_CURVA =
         400;
 
 
+    // --------------------------------------------------------
+    // FREIO
+    // --------------------------------------------------------
+
     constexpr int VELOCIDADE_FREIO =
         -1000;
 
-    constexpr unsigned long TEMPO_FREIO_MS =
-        100;
 
+    constexpr unsigned long TEMPO_FREIO_MS =
+        20;
+
+
+    // --------------------------------------------------------
+    // TEMPO DA CURVA DE 90°
+    // --------------------------------------------------------
 
     constexpr unsigned long TEMPO_CURVA_90_MS =
-        350;
+        900;
 
+
+    // --------------------------------------------------------
+    // TEMPO DA MEIA VOLTA
+    // --------------------------------------------------------
 
     constexpr unsigned long TEMPO_MEIA_VOLTA_MS =
-        10000000UL;
+        1800;
 
+
+    // --------------------------------------------------------
+    // QUANTIDADE DE LEITURAS SEM VERDE
+    //
+    // O verde precisa desaparecer por 3 leituras consecutivas
+    // para considerarmos que o robô saiu da região verde.
+    // --------------------------------------------------------
 
     constexpr int LEITURAS_SEM_VERDE_NECESSARIAS =
-        3;
+        40;
 
 
     // --------------------------------------------------------
-    // LIMITE DE PRETOS
+    // LIMITE PARA CONSIDERAR QUE EXISTE LINHA
     //
-    // 4 ou mais:
-    //     não executa curva.
+    // 4 ou mais pretos:
+    //
+    //      NÃO faz curva verde.
     //
     // 3 ou menos:
-    //     executa a manobra do verde.
+    //
+    //      pode executar a manobra correspondente ao verde.
     // --------------------------------------------------------
 
-    constexpr int MAX_PRETOS_SEM_CURVA =
-        3;
+    constexpr int MINIMO_PRETOS_LINHA =
+        4;
 }
 
 
@@ -62,10 +124,16 @@ Verde::Verde(
     :
     motores(motores),
     analise(analise),
+
     estado(NORMAL),
+
     verdeEsquerda(false),
     verdeDireita(false),
+
+    maiorQuantidadePretos(0),
+
     tempoInicio(0),
+
     leiturasSemVerde(0)
 {
 }
@@ -107,6 +175,21 @@ void Verde::andarDevagar()
         VELOCIDADE_VERDE,
         VELOCIDADE_VERDE,
         VELOCIDADE_VERDE
+    );
+}
+
+
+// ============================================================
+// ANDAR RETO
+// ============================================================
+
+void Verde::andarReto()
+{
+    motores.setSpeed(
+        VELOCIDADE_AVANCO_LINHA,
+        VELOCIDADE_AVANCO_LINHA,
+        VELOCIDADE_AVANCO_LINHA,
+        VELOCIDADE_AVANCO_LINHA
     );
 }
 
@@ -172,6 +255,52 @@ void Verde::meiaVolta()
 
 
 // ============================================================
+// INICIA AVANÇO APÓS LINHA
+// ============================================================
+//
+// Aqui chegamos quando:
+//
+// maiorQuantidadePretos >= 4
+//
+// O robô simplesmente avança reto por 300 ms.
+//
+// Depois disso o estado vira FINALIZADO.
+//
+// O Main então devolve o controle para o PID.
+// ============================================================
+
+void Verde::iniciarAvancoLinha()
+{
+    Serial.println(
+        "LINHA DETECTADA DURANTE VERDE"
+    );
+
+
+    Serial.print(
+        "MAIOR QUANTIDADE DE PRETOS: "
+    );
+
+
+    Serial.println(
+        maiorQuantidadePretos
+    );
+
+
+    Serial.println(
+        "AVANCANDO 300 MS ANTES DO PID"
+    );
+
+
+    tempoInicio =
+        millis();
+
+
+    estado =
+        AVANCO_LINHA;
+}
+
+
+// ============================================================
 // INICIA CURVA ESQUERDA
 // ============================================================
 
@@ -181,8 +310,10 @@ void Verde::iniciarCurvaEsquerda()
         "CURVA VERDE ESQUERDA"
     );
 
+
     tempoInicio =
         millis();
+
 
     estado =
         CURVA_ESQUERDA;
@@ -199,8 +330,10 @@ void Verde::iniciarCurvaDireita()
         "CURVA VERDE DIREITA"
     );
 
+
     tempoInicio =
         millis();
+
 
     estado =
         CURVA_DIREITA;
@@ -217,8 +350,10 @@ void Verde::iniciarMeiaVolta()
         "MEIA VOLTA VERDE"
     );
 
+
     tempoInicio =
         millis();
+
 
     estado =
         MEIA_VOLTA;
@@ -232,6 +367,7 @@ void Verde::iniciarMeiaVolta()
 void Verde::finalizar()
 {
     parar();
+
 
     estado =
         FINALIZADO;
@@ -249,7 +385,7 @@ void Verde::update(
 )
 {
     // ========================================================
-    // ANALISA OS DOIS SENSORES
+    // ANALISA OS DOIS SENSORES DE COR
     // ========================================================
 
     AS7341Resultado esquerda =
@@ -273,6 +409,10 @@ void Verde::update(
         NORMAL
     )
     {
+        // ----------------------------------------------------
+        // DETECTOU VERDE
+        // ----------------------------------------------------
+
         if(
             esquerda.verdeDetectado ||
             direita.verdeDetectado
@@ -282,6 +422,10 @@ void Verde::update(
                 "VERDE DETECTADO"
             );
 
+
+            // ------------------------------------------------
+            // GUARDA O LADO DO VERDE
+            // ------------------------------------------------
 
             if(
                 esquerda.verdeDetectado
@@ -301,19 +445,47 @@ void Verde::update(
             }
 
 
+            // ------------------------------------------------
+            // NOVA DETECÇÃO
+            //
+            // Começamos uma nova análise.
+            // Portanto o maior número de pretos precisa
+            // começar novamente em zero.
+            // ------------------------------------------------
+
+            maiorQuantidadePretos =
+                quantidadePretos;
+
+
+            leiturasSemVerde =
+                0;
+
+
+            // ------------------------------------------------
+            // FREIA
+            // ------------------------------------------------
+
             frear();
+
 
             tempoInicio =
                 millis();
 
+
             estado =
                 FREANDO;
+
 
             return;
         }
 
 
+        // ----------------------------------------------------
+        // NENHUM VERDE
+        // ----------------------------------------------------
+
         andarNormal();
+
 
         return;
     }
@@ -349,6 +521,17 @@ void Verde::update(
                 0;
 
 
+            // ------------------------------------------------
+            // IMPORTANTE:
+            //
+            // O valor inicial continua sendo a leitura que
+            // ocorreu no momento da detecção.
+            // ------------------------------------------------
+
+            tempoInicio =
+                millis();
+
+
             estado =
                 AVANCANDO;
         }
@@ -361,14 +544,40 @@ void Verde::update(
     // ========================================================
     // AVANÇANDO PELO VERDE
     // ========================================================
+    //
+    // AQUI ESTÁ A PRINCIPAL MUDANÇA.
+    //
+    // Enquanto o robô anda devagar:
+    //
+    // 1. continua procurando verde;
+    // 2. guarda esquerda/direita;
+    // 3. olha o array;
+    // 4. guarda o MAIOR número de pretos encontrado.
+    //
+    // Não importa se em uma leitura apareceram 2 pretos,
+    // depois 3, depois 1 e depois 5.
+    //
+    // O resultado será:
+    //
+    // maiorQuantidadePretos = 5
+    //
+    // ========================================================
 
     if(
         estado ==
         AVANCANDO
     )
     {
+        // ----------------------------------------------------
+        // ANDA DEVAGAR
+        // ----------------------------------------------------
+
         andarDevagar();
 
+
+        // ----------------------------------------------------
+        // GUARDA VERDE ESQUERDO
+        // ----------------------------------------------------
 
         if(
             esquerda.verdeDetectado
@@ -379,6 +588,10 @@ void Verde::update(
         }
 
 
+        // ----------------------------------------------------
+        // GUARDA VERDE DIREITO
+        // ----------------------------------------------------
+
         if(
             direita.verdeDetectado
         )
@@ -388,9 +601,33 @@ void Verde::update(
         }
 
 
-        // ----------------------------------------------------
-        // AINDA ESTÁ NO VERDE
-        // ----------------------------------------------------
+        // ====================================================
+        // GUARDA O MAIOR NÚMERO DE PRETOS
+        // ====================================================
+
+        if(
+            quantidadePretos >
+            maiorQuantidadePretos
+        )
+        {
+            maiorQuantidadePretos =
+                quantidadePretos;
+
+
+            Serial.print(
+                "NOVO MAIOR NUMERO DE PRETOS: "
+            );
+
+
+            Serial.println(
+                maiorQuantidadePretos
+            );
+        }
+
+
+        // ====================================================
+        // AINDA ESTÁ VENDO VERDE
+        // ====================================================
 
         if(
             esquerda.verdeDetectado ||
@@ -399,129 +636,227 @@ void Verde::update(
         {
             leiturasSemVerde =
                 0;
+
+
+            return;
+        }
+
+
+        // ====================================================
+        // NÃO ESTÁ VENDO VERDE
+        // ====================================================
+
+        leiturasSemVerde++;
+
+
+        // ----------------------------------------------------
+        // Ainda não confirmou saída do verde.
+        // ----------------------------------------------------
+
+        if(
+            leiturasSemVerde <
+            LEITURAS_SEM_VERDE_NECESSARIAS
+        )
+        {
+            return;
+        }
+
+
+        // ====================================================
+        // SAIU DO VERDE
+        // ====================================================
+
+        Serial.println(
+            "SAIU DO VERDE"
+        );
+
+
+        Serial.print(
+            "MAIOR NUMERO DE PRETOS VISTO: "
+        );
+
+
+        Serial.println(
+            maiorQuantidadePretos
+        );
+
+
+        Serial.print(
+            "VERDE ESQUERDA: "
+        );
+
+
+        Serial.println(
+            verdeEsquerda
+        );
+
+
+        Serial.print(
+            "VERDE DIREITA: "
+        );
+
+
+        Serial.println(
+            verdeDireita
+        );
+
+
+        // ====================================================
+        // DECISÃO FINAL
+        // ====================================================
+        //
+        // IMPORTANTE:
+        //
+        // NÃO usamos mais a quantidadePretos atual.
+        //
+        // Usamos:
+        //
+        // maiorQuantidadePretos
+        //
+        // que representa o maior número observado durante
+        // todo o avanço procurando pelo verde.
+        // ====================================================
+
+        if(
+            maiorQuantidadePretos >=
+            MINIMO_PRETOS_LINHA
+        )
+        {
+            // ------------------------------------------------
+            // 4 OU MAIS PRETOS
+            //
+            // NÃO É CURVA VERDE.
+            //
+            // Avança 300 ms e depois termina.
+            // ------------------------------------------------
+
+            iniciarAvancoLinha();
+
+
+            return;
+        }
+
+
+        // ====================================================
+        // MENOS DE 4 PRETOS
+        //
+        // Agora sim usamos os verdes encontrados.
+        // ====================================================
+
+        // ----------------------------------------------------
+        // VERDE SOMENTE À ESQUERDA
+        // ----------------------------------------------------
+
+        if(
+            verdeEsquerda &&
+            !verdeDireita
+        )
+        {
+            iniciarCurvaEsquerda();
+
+
+            return;
         }
 
 
         // ----------------------------------------------------
-        // NÃO ESTÁ MAIS NO VERDE
+        // VERDE SOMENTE À DIREITA
         // ----------------------------------------------------
 
-        else
+        if(
+            verdeDireita &&
+            !verdeEsquerda
+        )
         {
-            leiturasSemVerde++;
+            iniciarCurvaDireita();
 
 
-            if(
-                leiturasSemVerde >=
-                LEITURAS_SEM_VERDE_NECESSARIAS
-            )
-            {
-                parar();
+            return;
+        }
 
 
-                Serial.println(
-                    "SAIU DO VERDE"
-                );
+        // ----------------------------------------------------
+        // VERDE DOS DOIS LADOS
+        //
+        // MEIA VOLTA
+        // ----------------------------------------------------
+
+        if(
+            verdeEsquerda &&
+            verdeDireita
+        )
+        {
+            iniciarMeiaVolta();
 
 
-                Serial.print(
-                    "Pretos no array: "
-                );
-
-                Serial.println(
-                    quantidadePretos
-                );
+            return;
+        }
 
 
-                Serial.print(
-                    "Esquerda: "
-                );
+        // ----------------------------------------------------
+        // ERRO
+        // ----------------------------------------------------
 
-                Serial.println(
-                    verdeEsquerda
-                );
-
-
-                Serial.print(
-                    "Direita: "
-                );
-
-                Serial.println(
-                    verdeDireita
-                );
+        Serial.println(
+            "NENHUM VERDE REGISTRADO - ERRO"
+        );
 
 
-                // =================================================
-                // EXISTE LINHA SUFICIENTE
-                //
-                // 4 OU MAIS PRETOS
-                //
-                // Portanto não é uma saída de verde que
-                // deve gerar curva.
-                // =================================================
-
-                if(
-                    quantidadePretos >
-                    MAX_PRETOS_SEM_CURVA
-                )
-                {
-                    Serial.println(
-                        "LINHA PRESENTE - NAO FAZ CURVA"
-                    );
+        finalizar();
 
 
-                    finalizar();
-
-                    return;
-                }
+        return;
+    }
 
 
-                // =================================================
-                // 3 OU MENOS PRETOS
-                //
-                // Executa a manobra do verde.
-                // =================================================
+    // ========================================================
+    // AVANÇO APÓS DETECTAR LINHA
+    // ========================================================
+    //
+    // Este estado só acontece quando:
+    //
+    // maiorQuantidadePretos >= 4
+    //
+    // Aqui o robô não usa PID.
+    //
+    // Ele simplesmente vai reto durante 300 ms.
+    //
+    // Depois:
+    //
+    //     FINALIZADO
+    //
+    // O Main então devolve o controle ao PID.
+    // ========================================================
 
-                if(
-                    verdeEsquerda &&
-                    !verdeDireita
-                )
-                {
-                    iniciarCurvaEsquerda();
-
-                    return;
-                }
-
-
-                if(
-                    verdeDireita &&
-                    !verdeEsquerda
-                )
-                {
-                    iniciarCurvaDireita();
-
-                    return;
-                }
-
-
-                if(
-                    verdeEsquerda &&
-                    verdeDireita
-                )
-                {
-                    iniciarMeiaVolta();
-
-                    return;
-                }
+    if(
+        estado ==
+        AVANCO_LINHA
+    )
+    {
+        andarReto();
 
 
-                Serial.println(
-                    "NENHUM VERDE - ERRO"
-                );
+        if(
+            millis() -
+            tempoInicio >=
+            TEMPO_AVANCO_LINHA_MS
+        )
+        {
+            parar();
 
 
-                finalizar();
-            }
+            Serial.println(
+                "AVANCO DE LINHA TERMINADO"
+            );
+
+
+            Serial.println(
+                "DEVOLVENDO CONTROLE AO PID"
+            );
+
+
+            estado =
+                FINALIZADO;
         }
 
 
@@ -645,6 +980,7 @@ void Verde::update(
     {
         parar();
 
+
         return;
     }
 }
@@ -658,17 +994,26 @@ void Verde::reset()
 {
     parar();
 
+
     estado =
         NORMAL;
+
 
     verdeEsquerda =
         false;
 
+
     verdeDireita =
         false;
 
+
+    maiorQuantidadePretos =
+        0;
+
+
     tempoInicio =
         0;
+
 
     leiturasSemVerde =
         0;
@@ -681,8 +1026,10 @@ void Verde::reset()
 
 bool Verde::estaExecutando() const
 {
-    return estado != NORMAL &&
-           estado != FINALIZADO;
+    return (
+        estado != NORMAL &&
+        estado != FINALIZADO
+    );
 }
 
 
@@ -692,8 +1039,10 @@ bool Verde::estaExecutando() const
 
 bool Verde::finalizado() const
 {
-    return estado ==
-           FINALIZADO;
+    return (
+        estado ==
+        FINALIZADO
+    );
 }
 
 
