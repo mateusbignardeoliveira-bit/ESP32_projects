@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <FastLED.h>
 
-#define LED_PIN     33
+#define LED_PIN     25
 #define NUM_LEDS    8
 #define BRIGHTNESS  255
 

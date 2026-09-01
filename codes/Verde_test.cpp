@@ -71,8 +71,8 @@ AS7341Sensores sensoresAS7341(tca);
 
 ArrayLinha arrayLinha(
     Serial2,
-    25,
-    26,
+    18,
+    5,
     115200
 );
 
@@ -83,8 +83,8 @@ ArrayLinha arrayLinha(
 
 MotorControlador motorControlador(
     Serial1,
-    17,
     16,
+    17,
     115200
 );
 

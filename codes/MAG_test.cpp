@@ -1,8 +1,8 @@
 #include <arduino.h>
 #include <Wire.h>
 
-#define SDA_PIN 21
-#define SCL_PIN 22
+#define SDA_PIN 19
+#define SCL_PIN 23
 
 #define ICM_ADDR 0x68
 #define AK_ADDR  0x0C
