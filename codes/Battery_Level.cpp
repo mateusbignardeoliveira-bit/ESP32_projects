@@ -9,8 +9,8 @@ void setup()
     motorSerial.begin(
         115200,
         SERIAL_8N1,
-        16,
-        17
+        17,
+        16
     );
 
     delay(1000);

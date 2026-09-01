@@ -19,18 +19,18 @@ const int PINO_BOTAO = 32;
 // VELOCIDADES
 // ============================================================
 
-const int VELOCIDADE_ROBO = 400;
+const int VELOCIDADE_ROBO = -400;
 
-const int VELOCIDADE_VERDE = 60;
+const int VELOCIDADE_VERDE = -60;
 
-const int VELOCIDADE_CURVA = 400;
+const int VELOCIDADE_CURVA = 600;
 
 
 // ============================================================
 // FRENAGEM
 // ============================================================
 
-const int VELOCIDADE_FREIO = -1000;
+const int VELOCIDADE_FREIO = 1000;
 
 const int TEMPO_FREIO_MS = 100;
 
@@ -44,9 +44,9 @@ const int TEMPO_FREIO_MS = 100;
 // Depois regulamos com o robô fisicamente.
 // ============================================================
 
-const int TEMPO_CURVA_90_MS = 350;
+const int TEMPO_CURVA_90_MS = 450;
 
-const int TEMPO_MEIA_VOLTA_MS = 10000000;
+const int TEMPO_MEIA_VOLTA_MS = 700;
 
 
 // ============================================================
@@ -71,8 +71,8 @@ AS7341Sensores sensoresAS7341(tca);
 
 ArrayLinha arrayLinha(
     Serial2,
-    5,
-    18,
+    25,
+    26,
     115200
 );
 
@@ -83,8 +83,8 @@ ArrayLinha arrayLinha(
 
 MotorControlador motorControlador(
     Serial1,
-    16,
     17,
+    16,
     115200
 );
 
