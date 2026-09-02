@@ -91,10 +91,26 @@ public:
 
 
     // ========================================================
-    // Para imediatamente os quatro motores
+    // Para os motores usando controle de velocidade (PID)
+    //
+    // IMPORTANTE:
+    // O PID interno do Yahboom continua ativo.
     // ========================================================
 
     void stop();
+
+
+    // ========================================================
+    // Libera completamente o controle PID dos motores
+    //
+    // Envia:
+    // $pwm:0,0,0,0#
+    //
+    // Usado quando queremos que os motores realmente fiquem
+    // sem comando de torque pelo controlador de velocidade.
+    // ========================================================
+
+    void release();
 
 
     // ========================================================

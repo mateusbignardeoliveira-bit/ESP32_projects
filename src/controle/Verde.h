@@ -3,37 +3,48 @@
 
 #include <Arduino.h>
 
-#include "hardware/MotorControlador.h"
 #include "sensores/AS7341Analise.h"
+
+
+struct AvaliacaoCorData
+{
+    bool avaliando;
+
+    bool finalizada;
+
+    bool verdeEsquerda;
+
+    bool verdeDireita;
+
+    bool vermelhoEsquerda;
+
+    bool vermelhoDireita;
+
+    bool cinzaEsquerda;
+
+    bool cinzaDireita;
+
+    int maiorQuantidadePretos;
+
+    bool encontrouAmbosLados;
+
+    bool encontrouVermelho;
+
+    bool encontrouCinza;
+};
 
 
 class Verde
 {
 public:
 
-    enum Estado
-    {
-        NORMAL,
-
-        FREANDO,
-
-        AVANCANDO,
-
-        AVANCO_LINHA,
-
-        CURVA_ESQUERDA,
-
-        CURVA_DIREITA,
-
-        MEIA_VOLTA,
-
-        FINALIZADO
-    };
-
-
     Verde(
-        MotorControlador& motores,
         AS7341Analise& analise
+    );
+
+
+    void iniciar(
+        int quantidadePretosInicial
     );
 
 
@@ -44,16 +55,16 @@ public:
     );
 
 
+    void finalizar();
+
+
     void reset();
 
 
-    bool estaExecutando() const;
+    bool estaAvaliando() const;
 
 
     bool finalizado() const;
-
-
-    Estado getEstado() const;
 
 
     bool detectouVerdeEsquerda() const;
@@ -62,73 +73,27 @@ public:
     bool detectouVerdeDireita() const;
 
 
-private:
+    bool detectouVerdeDosDoisLados() const;
 
-    MotorControlador& motores;
+
+    bool detectouVermelho() const;
+
+
+    bool detectouCinza() const;
+
+
+    int getMaiorQuantidadePretos() const;
+
+
+    AvaliacaoCorData getData() const;
+
+
+private:
 
     AS7341Analise& analise;
 
 
-    Estado estado;
-
-
-    bool verdeEsquerda;
-
-    bool verdeDireita;
-
-
-    // ========================================================
-    // MAIOR QUANTIDADE DE PRETOS VISTA DURANTE O AVANÇO
-    // ========================================================
-
-    int maiorQuantidadePretos;
-
-
-    unsigned long tempoInicio;
-
-
-    int leiturasSemVerde;
-
-
-    // ========================================================
-    // FUNÇÕES DE MOVIMENTO
-    // ========================================================
-
-    void parar();
-
-    void andarNormal();
-
-    void andarDevagar();
-
-    void andarReto();
-
-    void frear();
-
-    void curvaEsquerda();
-
-    void curvaDireita();
-
-    void meiaVolta();
-
-
-    // ========================================================
-    // INÍCIO DAS MANOBRAS
-    // ========================================================
-
-    void iniciarAvancoLinha();
-
-    void iniciarCurvaEsquerda();
-
-    void iniciarCurvaDireita();
-
-    void iniciarMeiaVolta();
-
-
-    // ========================================================
-    // FINALIZA
-    // ========================================================
-
-    void finalizar();
+    AvaliacaoCorData resultado;
 };
 
 #endif

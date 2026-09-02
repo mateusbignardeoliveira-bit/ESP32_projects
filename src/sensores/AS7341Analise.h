@@ -3,6 +3,7 @@
 
 #include "hardware/AS7341.h"
 
+
 // ============================================================
 // RESULTADO DA ANÁLISE DE UM AS7341
 // ============================================================
@@ -11,34 +12,56 @@ struct AS7341Resultado
 {
     bool valido;
 
-    // Intensidade geral
+
+    // ========================================================
+    // INTENSIDADE GERAL
+    // ========================================================
+
     float intensidade;
 
-    // Componentes espectrais agrupados
+
+    // ========================================================
+    // COMPONENTES ESPECTRAIS AGRUPADOS
+    // ========================================================
+
     float azul;
     float verde;
     float vermelho;
 
-    // Relações entre componentes
+
+    // ========================================================
+    // RELAÇÕES ENTRE COMPONENTES
+    // ========================================================
+
     float razaoVermelhoVerde;
     float razaoAzulVerde;
 
-    // NIR em relação ao Clear
     float razaoNIR;
 
-    // Canal dominante
+
+    // ========================================================
+    // CANAL DOMINANTE
+    //
     // 0 = inválido
     // 1 = azul
     // 2 = verde
     // 3 = vermelho
+    // ========================================================
+
     uint8_t canalDominante;
 
+
     // ========================================================
-    // DETECÇÃO DE VERDE
+    // DETECÇÃO DE CORES
     // ========================================================
 
     bool verdeDetectado;
+
+    bool vermelhoDetectado;
+
+    bool cinzaDetectado;
 };
+
 
 // ============================================================
 // RESULTADO COMPARATIVO
@@ -47,13 +70,18 @@ struct AS7341Resultado
 struct AS7341Comparacao
 {
     float diferencaIntensidade;
+
     float diferencaVermelho;
+
     float diferencaVerde;
+
     float diferencaAzul;
 
     bool direitaMaisIntensa;
+
     bool esquerdaMaisIntensa;
 };
+
 
 // ============================================================
 // CLASSE
@@ -65,40 +93,51 @@ public:
 
     AS7341Analise();
 
-    // --------------------------------------------------------
-    // Analisa um sensor
-    // --------------------------------------------------------
+
+    // ========================================================
+    // ANALISA UM SENSOR
+    // ========================================================
 
     AS7341Resultado analisar(
         const AS7341Data& dados
     );
 
-    // --------------------------------------------------------
-    // Compara direita e esquerda
-    // --------------------------------------------------------
+
+    // ========================================================
+    // COMPARA DIREITA / ESQUERDA
+    // ========================================================
 
     AS7341Comparacao comparar(
         const AS7341Resultado& direita,
         const AS7341Resultado& esquerda
     );
 
+
 private:
+
+    // ========================================================
+    // CÁLCULOS
+    // ========================================================
 
     float calcularIntensidade(
         const AS7341Data& dados
     );
 
+
     float calcularAzul(
         const AS7341Data& dados
     );
+
 
     float calcularVerde(
         const AS7341Data& dados
     );
 
+
     float calcularVermelho(
         const AS7341Data& dados
     );
+
 
     uint8_t descobrirCanalDominante(
         float azul,
@@ -106,13 +145,25 @@ private:
         float vermelho
     );
 
-    // --------------------------------------------------------
-    // Detecta verde diretamente pelos canais do AS7341
-    // --------------------------------------------------------
+
+    // ========================================================
+    // DETECÇÃO DE CORES
+    // ========================================================
 
     bool detectarVerde(
         const AS7341Data& dados
     );
+
+
+    bool detectarVermelho(
+        const AS7341Data& dados
+    );
+
+
+    bool detectarCinza(
+        const AS7341Data& dados
+    );
 };
+
 
 #endif

@@ -6,6 +6,10 @@
 #include "sensores/LinhaAnalise.h"
 
 
+// ============================================================
+// DIREÇÃO
+// ============================================================
+
 enum DirecaoCurva
 {
     CURVA_NENHUMA,
@@ -14,55 +18,100 @@ enum DirecaoCurva
 };
 
 
+// ============================================================
+// DADOS DA ANÁLISE DA REGIÃO DA LINHA
+// ============================================================
+
 struct CurvaData
 {
-    bool curva90;
+    // --------------------------------------------------------
+    // Quantidade de sensores pretos
+    // --------------------------------------------------------
 
-    DirecaoCurva direcao;
+    int sensoresPretos;
 
     int sensoresEsquerda;
 
     int sensoresDireita;
 
+
+    // --------------------------------------------------------
+    // Características da linha
+    // --------------------------------------------------------
+
     bool linhaCentral;
 
     bool linhaLarga;
+
+    bool todosBrancos;
+
+
+    // --------------------------------------------------------
+    // Entrada na avaliação especial
+    // --------------------------------------------------------
+
+    bool avaliacaoEspecial;
+
+
+    // --------------------------------------------------------
+    // Compatibilidade temporária
+    //
+    // Estes campos ainda existem porque o Main antigo
+    // utiliza CurvaData.
+    //
+    // Eles NÃO serão usados para decidir curvas.
+    // Serão removidos quando o novo sistema de decisão
+    // estiver integrado.
+    // --------------------------------------------------------
+
+    bool curva90;
+
+    DirecaoCurva direcao;
 
     bool cruzamento;
 };
 
 
+// ============================================================
+// CLASSE
+// ============================================================
+
 class CurvaAnalise
 {
-
 private:
 
-    // Intensidade mínima para considerar
-    // um sensor como preto.
+    // --------------------------------------------------------
+    // Sensor considerado preto
+    // --------------------------------------------------------
 
-    const float LIMIAR_PRETO =
-        0.35f;
-
-
-    // Quantidade mínima de sensores
-    // de um lado para considerar curva.
-
-    const int MINIMO_SENSORES_LADO =
-        3;
+    static constexpr float LIMIAR_PRETO = 0.35f;
 
 
-    // Diferença mínima entre os lados.
+    // --------------------------------------------------------
+    // Quantidade de pretos para iniciar avaliação especial
+    // --------------------------------------------------------
 
-    const int DOMINANCIA_MINIMA =
-        2;
+    static constexpr int MINIMO_PRETOS_AVALIACAO = 4;
 
 
-    // Quantidade mínima de sensores pretos
-    // para considerar cruzamento.
+    // --------------------------------------------------------
+    // Sensores centrais
+    //
+    // Array:
+    //
+    // s1 s2 s3 s4 s5 s6 s7 s8
+    //
+    // Centro:
+    // s4 e s5
+    // --------------------------------------------------------
 
-    const int MINIMO_SENSORES_CRUZAMENTO =
-        7;
+    static constexpr int SENSOR_CENTRO_ESQUERDO = 3;
+    static constexpr int SENSOR_CENTRO_DIREITO = 4;
 
+
+    // --------------------------------------------------------
+    // Resultado atual
+    // --------------------------------------------------------
 
     CurvaData resultado;
 
@@ -72,10 +121,18 @@ public:
     CurvaAnalise();
 
 
+    // --------------------------------------------------------
+    // Atualiza análise
+    // --------------------------------------------------------
+
     void update(
         const LinhaData& linha
     );
 
+
+    // --------------------------------------------------------
+    // Retorna resultado
+    // --------------------------------------------------------
 
     CurvaData getData();
 };

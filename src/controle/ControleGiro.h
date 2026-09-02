@@ -15,21 +15,13 @@ public:
         MotorControlador& motores
     );
 
-    // ---------------------------------------------------------
-    // INICIALIZAÇÃO
-    // ---------------------------------------------------------
-
     void begin();
 
-    // ---------------------------------------------------------
-    // ATUALIZAÇÃO
-    // ---------------------------------------------------------
-
-    // Deve ser chamado continuamente no loop.
+    // Deve ser chamado continuamente.
     void update();
 
     // ---------------------------------------------------------
-    // CURVAS
+    // MANOBRAS
     // ---------------------------------------------------------
 
     void curva90Direita();
@@ -38,11 +30,6 @@ public:
 
     void curva180();
 
-    // Gira um determinado ângulo.
-    //
-    // positivo  = direita
-    // negativo  = esquerda
-    //
     void girar(float angulo);
 
     // ---------------------------------------------------------
@@ -65,9 +52,9 @@ public:
 
     void setKp(float kp);
 
-    void setKi(float ki);
-
     void setKd(float kd);
+
+    void setTolerancia(float graus);
 
 private:
 
@@ -75,58 +62,45 @@ private:
 
     MotorControlador& controladorMotores;
 
-    // ---------------------------------------------------------
-    // ESTADO DA CURVA
-    // ---------------------------------------------------------
-
     bool emCurva;
 
     bool curvaTerminada;
-
-    float anguloInicial;
 
     float anguloAlvo;
 
     float erroAnterior;
 
-    float integralErro;
-
     uint32_t ultimoTempo;
 
-    // ---------------------------------------------------------
-    // CONFIGURAÇÃO
-    // ---------------------------------------------------------
+    uint32_t entrouNaTolerancia;
 
     int velocidadeMaxima;
 
     int velocidadeMinima;
 
-    // PID da curva
     float kp;
-    float ki;
+
     float kd;
 
-    // Tolerância para considerar que chegou ao alvo.
     float tolerancia;
 
-    // Tempo mínimo dentro da tolerância antes de terminar.
     uint32_t tempoEstabilizacao;
 
-    uint32_t entrouNaTolerancia;
+    float calcularErro() const;
 
-    // ---------------------------------------------------------
-    // FUNÇÕES INTERNAS
-    // ---------------------------------------------------------
-
-    float calcularErro();
-
-    void controlarMotores(float correcao);
+    void controlarMotores(
+        float erro
+    );
 
     void pararMotores();
 
     bool chegouAoAlvo();
 
-    float limitar(float valor, float minimo, float maximo);
+    float limitar(
+        float valor,
+        float minimo,
+        float maximo
+    ) const;
 };
 
 #endif

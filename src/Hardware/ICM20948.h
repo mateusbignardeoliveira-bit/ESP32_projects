@@ -6,7 +6,6 @@
 
 struct ICM20948Data
 {
-    // Acelerômetro
     int16_t accelRawX;
     int16_t accelRawY;
     int16_t accelRawZ;
@@ -15,7 +14,6 @@ struct ICM20948Data
     float accelY;
     float accelZ;
 
-    // Giroscópio
     int16_t gyroRawX;
     int16_t gyroRawY;
     int16_t gyroRawZ;
@@ -24,7 +22,6 @@ struct ICM20948Data
     float gyroY;
     float gyroZ;
 
-    // Magnetômetro
     int16_t magRawX;
     int16_t magRawY;
     int16_t magRawZ;
@@ -33,22 +30,19 @@ struct ICM20948Data
     float magY;
     float magZ;
 
-    // Temperatura
     int16_t tempRaw;
     float temperature;
 
-    // Estado do magnetômetro
     bool magDataReady;
     bool magOverflow;
 };
-
 
 class ICM20948
 {
 public:
 
     ICM20948(
-        TwoWire &wire = Wire,
+        TwoWire& wire = Wire,
         uint8_t endereco = 0x68
     );
 
@@ -60,14 +54,13 @@ public:
 
     bool update();
 
-    const ICM20948Data &getData() const;
+    const ICM20948Data& getData() const;
 
     bool isConnected() const;
 
-
 private:
 
-    TwoWire &_wire;
+    TwoWire& _wire;
 
     uint8_t _enderecoICM;
     uint8_t _enderecoMag;
@@ -75,7 +68,6 @@ private:
     ICM20948Data _dados;
 
     bool _conectado;
-
 
     bool escrever(
         uint8_t endereco,
@@ -91,7 +83,7 @@ private:
     bool lerBytes(
         uint8_t endereco,
         uint8_t reg,
-        uint8_t *dados,
+        uint8_t* dados,
         uint8_t quantidade
     );
 

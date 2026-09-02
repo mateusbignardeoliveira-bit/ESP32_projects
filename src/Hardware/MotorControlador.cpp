@@ -22,9 +22,6 @@ serial(portaSerial)
 
     // --------------------------------------------------------
     // Limite utilizado pelo robô
-    //
-    // O driver aceita valores maiores, mas deixamos isso
-    // controlado pela classe.
     // --------------------------------------------------------
 
     velocidadeMaxima = 1000;
@@ -102,10 +99,10 @@ void MotorControlador::begin()
 
     // --------------------------------------------------------
     // Diâmetro da roda
-    // 48 mm
+    // 66 mm
     // --------------------------------------------------------
 
-    enviarComando("$wdiameter:48#");
+    enviarComando("$wdiameter:66#");
 
     delay(300);
 
@@ -121,6 +118,8 @@ void MotorControlador::begin()
 
     // --------------------------------------------------------
     // PID interno do driver
+    //
+    // Mantido exatamente como estava.
     // --------------------------------------------------------
 
     enviarComando("$MPID:0.8,0.06,0.5#");
@@ -130,10 +129,19 @@ void MotorControlador::begin()
 
     // --------------------------------------------------------
     // Segurança:
-    // começa com todos os motores parados
+    // primeiro zera a referência de velocidade
     // --------------------------------------------------------
 
     stop();
+
+    delay(100);
+
+
+    // --------------------------------------------------------
+    // Depois libera completamente o controle PID
+    // --------------------------------------------------------
+
+    release();
 
 }
 
@@ -240,12 +248,53 @@ void MotorControlador::setSpeed(
 void MotorControlador::stop()
 {
 
+    // --------------------------------------------------------
+    // Zera a referência de velocidade.
+    //
+    // ATENÇÃO:
+    // Segundo o protocolo Yahboom, o PID continua ativo
+    // mesmo com velocidade igual a zero.
+    // --------------------------------------------------------
+
     setSpeed(
         0,
         0,
         0,
         0
     );
+
+}
+
+
+
+// ============================================================
+// RELEASE
+// ============================================================
+
+void MotorControlador::release()
+{
+
+    // --------------------------------------------------------
+    // Libera completamente o controle dos motores.
+    //
+    // O comando PWM com zero desativa a atuação do PID
+    // sobre os motores.
+    //
+    // $pwm:0,0,0,0#
+    // --------------------------------------------------------
+
+    enviarComando("$pwm:0,0,0,0#");
+
+
+    // --------------------------------------------------------
+    // Como não estamos enviando velocidade aqui, mantemos
+    // os últimos valores registrados como zero.
+    // --------------------------------------------------------
+
+    ultimoM1 = 0;
+    ultimoM2 = 0;
+    ultimoM3 = 0;
+    ultimoM4 = 0;
 
 }
 

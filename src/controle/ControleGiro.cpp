@@ -17,25 +17,20 @@ ControleGiro::ControleGiro(
       emCurva(false),
       curvaTerminada(false),
 
-      anguloInicial(0.0f),
       anguloAlvo(0.0f),
-
       erroAnterior(0.0f),
-      integralErro(0.0f),
 
       ultimoTempo(0),
+      entrouNaTolerancia(0),
 
       velocidadeMaxima(100),
-      velocidadeMinima(35),
+      velocidadeMinima(30),
 
-      kp(2.0f),
-      ki(0.0f),
-      kd(0.15f),
+      kp(1.8f),
+      kd(0.10f),
 
       tolerancia(2.0f),
-
-      tempoEstabilizacao(50),
-      entrouNaTolerancia(0)
+      tempoEstabilizacao(60)
 {
 }
 
@@ -48,10 +43,13 @@ void ControleGiro::begin()
     emCurva = false;
     curvaTerminada = false;
 
-    erroAnterior = 0.0f;
-    integralErro = 0.0f;
+    anguloAlvo = 0.0f;
 
-    ultimoTempo = millis();
+    erroAnterior = 0.0f;
+
+    entrouNaTolerancia = 0;
+
+    ultimoTempo = micros();
 
     pararMotores();
 }
@@ -62,41 +60,48 @@ void ControleGiro::begin()
 
 void ControleGiro::update()
 {
-    if (!emCurva) {
+    if (!emCurva)
+        return;
+
+    // ---------------------------------------------------------
+    // Atualiza IMU
+    // ---------------------------------------------------------
+
+    if (!sensorIMU.update())
+    {
+        pararMotores();
         return;
     }
 
     // ---------------------------------------------------------
-    // ATUALIZAÇÃO DA IMU
+    // DT
     // ---------------------------------------------------------
 
-    if (!sensorIMU.update()) {
-        return;
-    }
-
-    // ---------------------------------------------------------
-    // TEMPO
-    // ---------------------------------------------------------
-
-    uint32_t agora = millis();
+    uint32_t agora = micros();
 
     float dt =
-        (agora - ultimoTempo) / 1000.0f;
+        (agora - ultimoTempo) /
+        1000000.0f;
 
     ultimoTempo = agora;
 
-    if (dt <= 0.0f || dt > 0.2f) {
+    if (
+        dt <= 0.0f ||
+        dt > 0.1f
+    )
+    {
         dt = 0.01f;
     }
 
     // ---------------------------------------------------------
-    // ERRO ANGULAR
+    // ERRO
     // ---------------------------------------------------------
 
-    float erro = calcularErro();
+    float erro =
+        calcularErro();
 
     // ---------------------------------------------------------
-    // VERIFICA CHEGADA
+    // CHEGOU?
     // ---------------------------------------------------------
 
     if (chegouAoAlvo())
@@ -107,38 +112,27 @@ void ControleGiro::update()
         curvaTerminada = true;
 
         erroAnterior = 0.0f;
-        integralErro = 0.0f;
 
         return;
     }
 
     // ---------------------------------------------------------
-    // PID
+    // DERIVATIVO
     // ---------------------------------------------------------
 
-    integralErro += erro * dt;
-
-    // Anti-windup
-    integralErro =
-        limitar(
-            integralErro,
-            -100.0f,
-            100.0f
-        );
-
     float derivada =
-        (erro - erroAnterior) / dt;
+        (erro - erroAnterior) /
+        dt;
 
     erroAnterior = erro;
 
+    // ---------------------------------------------------------
+    // CONTROLE
+    // ---------------------------------------------------------
+
     float correcao =
         kp * erro +
-        ki * integralErro +
         kd * derivada;
-
-    // ---------------------------------------------------------
-    // LIMITA CORREÇÃO
-    // ---------------------------------------------------------
 
     correcao =
         limitar(
@@ -147,15 +141,11 @@ void ControleGiro::update()
             velocidadeMaxima
         );
 
-    // ---------------------------------------------------------
-    // CONTROLA MOTORES
-    // ---------------------------------------------------------
-
     controlarMotores(correcao);
 }
 
 // =============================================================
-// CURVA 90 DIREITA
+// 90 DIREITA
 // =============================================================
 
 void ControleGiro::curva90Direita()
@@ -164,7 +154,7 @@ void ControleGiro::curva90Direita()
 }
 
 // =============================================================
-// CURVA 90 ESQUERDA
+// 90 ESQUERDA
 // =============================================================
 
 void ControleGiro::curva90Esquerda()
@@ -173,7 +163,7 @@ void ControleGiro::curva90Esquerda()
 }
 
 // =============================================================
-// CURVA 180
+// 180
 // =============================================================
 
 void ControleGiro::curva180()
@@ -187,73 +177,49 @@ void ControleGiro::curva180()
 
 void ControleGiro::girar(float angulo)
 {
-    if (emCurva) {
+    if (emCurva)
         return;
-    }
 
-    // ---------------------------------------------------------
-    // LEITURA DO ÂNGULO ATUAL
-    // ---------------------------------------------------------
+    if (fabsf(angulo) < 1.0f)
+        return;
 
     float atual =
         sensorIMU.getHeading();
-
-    anguloInicial = atual;
-
-    // ---------------------------------------------------------
-    // CALCULA ALVO
-    // ---------------------------------------------------------
 
     anguloAlvo =
         atual + angulo;
 
-    // Normaliza
-    while (anguloAlvo >= 360.0f) {
+    while (anguloAlvo >= 360.0f)
         anguloAlvo -= 360.0f;
-    }
 
-    while (anguloAlvo < 0.0f) {
+    while (anguloAlvo < 0.0f)
         anguloAlvo += 360.0f;
-    }
-
-    // ---------------------------------------------------------
-    // RESETA PID
-    // ---------------------------------------------------------
 
     erroAnterior = 0.0f;
 
-    integralErro = 0.0f;
-
     entrouNaTolerancia = 0;
 
-    ultimoTempo = millis();
-
-    // ---------------------------------------------------------
-    // ATIVA CURVA
-    // ---------------------------------------------------------
-
-    emCurva = true;
+    ultimoTempo = micros();
 
     curvaTerminada = false;
+
+    emCurva = true;
 }
 
 // =============================================================
-// CALCULAR ERRO
+// ERRO
 // =============================================================
 
-float ControleGiro::calcularErro()
+float ControleGiro::calcularErro() const
 {
-    float atual =
-        sensorIMU.getHeading();
-
     return IMU::diferencaAngular(
-        atual,
+        sensorIMU.getHeading(),
         anguloAlvo
     );
 }
 
 // =============================================================
-// CONTROLAR MOTORES
+// CONTROLE DOS MOTORES
 // =============================================================
 
 void ControleGiro::controlarMotores(
@@ -263,22 +229,29 @@ void ControleGiro::controlarMotores(
     /*
      * Convenção:
      *
-     * motor esquerdo  = m1/m2
-     * motor direito   = m3/m4
+     * M1/M2 = esquerda
+     * M3/M4 = direita
      *
-     * Para girar para a direita:
+     * correcao positiva:
+     *     gira para direita
      *
-     * esquerda  +
-     * direita   -
-     *
-     * Para girar para a esquerda:
-     *
-     * esquerda  -
-     * direita   +
+     * correcao negativa:
+     *     gira para esquerda
      */
 
-    int velocidadeEsquerda;
-    int velocidadeDireita;
+    float magnitude =
+        fabsf(correcao);
+
+    int velocidade =
+        velocidadeMinima +
+        (int)magnitude;
+
+    velocidade =
+        constrain(
+            velocidade,
+            velocidadeMinima,
+            velocidadeMaxima
+        );
 
     if (correcao > 0.0f)
     {
@@ -286,15 +259,12 @@ void ControleGiro::controlarMotores(
         // DIREITA
         // -----------------------------------------------------
 
-        velocidadeEsquerda =
-            velocidadeMinima +
-            (int)fabsf(correcao);
-
-        velocidadeDireita =
-            -(
-                velocidadeMinima +
-                (int)fabsf(correcao)
-            );
+        controladorMotores.setSpeed(
+            velocidade,
+            velocidade,
+            -velocidade,
+            -velocidade
+        );
     }
     else
     {
@@ -302,49 +272,17 @@ void ControleGiro::controlarMotores(
         // ESQUERDA
         // -----------------------------------------------------
 
-        velocidadeEsquerda =
-            -(
-                velocidadeMinima +
-                (int)fabsf(correcao)
-            );
-
-        velocidadeDireita =
-            velocidadeMinima +
-            (int)fabsf(correcao);
+        controladorMotores.setSpeed(
+            -velocidade,
+            -velocidade,
+            velocidade,
+            velocidade
+        );
     }
-
-    // ---------------------------------------------------------
-    // LIMITA VELOCIDADES
-    // ---------------------------------------------------------
-
-    velocidadeEsquerda =
-        (int)limitar(
-            velocidadeEsquerda,
-            -velocidadeMaxima,
-            velocidadeMaxima
-        );
-
-    velocidadeDireita =
-        (int)limitar(
-            velocidadeDireita,
-            -velocidadeMaxima,
-            velocidadeMaxima
-        );
-
-    // ---------------------------------------------------------
-    // ENVIA AOS QUATRO MOTORES
-    // ---------------------------------------------------------
-
-    controladorMotores.setSpeed(
-        velocidadeEsquerda,
-        velocidadeEsquerda,
-        velocidadeDireita,
-        velocidadeDireita
-    );
 }
 
 // =============================================================
-// PARAR MOTORES
+// PARAR
 // =============================================================
 
 void ControleGiro::pararMotores()
@@ -364,18 +302,22 @@ void ControleGiro::pararMotores()
 bool ControleGiro::chegouAoAlvo()
 {
     float erro =
-        fabsf(calcularErro());
+        fabsf(
+            calcularErro()
+        );
 
     if (erro <= tolerancia)
     {
         if (entrouNaTolerancia == 0)
         {
-            entrouNaTolerancia = millis();
+            entrouNaTolerancia =
+                millis();
         }
 
         if (
-            millis() - entrouNaTolerancia
-            >= tempoEstabilizacao
+            millis() -
+            entrouNaTolerancia >=
+            tempoEstabilizacao
         )
         {
             return true;
@@ -412,45 +354,75 @@ void ControleGiro::cancelar()
     pararMotores();
 
     emCurva = false;
-
     curvaTerminada = false;
 
-    erroAnterior = 0.0f;
+    anguloAlvo = 0.0f;
 
-    integralErro = 0.0f;
+    erroAnterior = 0.0f;
 
     entrouNaTolerancia = 0;
 }
 
 // =============================================================
-// CONFIGURAÇÃO
+// CONFIGURAÇÕES
 // =============================================================
 
-void ControleGiro::setVelocidade(int velocidade)
+void ControleGiro::setVelocidade(
+    int velocidade
+)
 {
     velocidadeMaxima =
         abs(velocidade);
+
+    if (
+        velocidadeMinima >
+        velocidadeMaxima
+    )
+    {
+        velocidadeMinima =
+            velocidadeMaxima;
+    }
 }
 
-void ControleGiro::setVelocidadeMinima(int velocidade)
+void ControleGiro::setVelocidadeMinima(
+    int velocidade
+)
 {
     velocidadeMinima =
         abs(velocidade);
+
+    if (
+        velocidadeMinima >
+        velocidadeMaxima
+    )
+    {
+        velocidadeMinima =
+            velocidadeMaxima;
+    }
 }
 
-void ControleGiro::setKp(float valor)
+void ControleGiro::setKp(
+    float valor
+)
 {
     kp = valor;
 }
 
-void ControleGiro::setKi(float valor)
-{
-    ki = valor;
-}
-
-void ControleGiro::setKd(float valor)
+void ControleGiro::setKd(
+    float valor
+)
 {
     kd = valor;
+}
+
+void ControleGiro::setTolerancia(
+    float graus
+)
+{
+    if (graus < 0.1f)
+        graus = 0.1f;
+
+    tolerancia = graus;
 }
 
 // =============================================================
@@ -461,15 +433,13 @@ float ControleGiro::limitar(
     float valor,
     float minimo,
     float maximo
-)
+) const
 {
-    if (valor < minimo) {
+    if (valor < minimo)
         return minimo;
-    }
 
-    if (valor > maximo) {
+    if (valor > maximo)
         return maximo;
-    }
 
     return valor;
 }

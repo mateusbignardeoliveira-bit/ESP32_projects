@@ -30,7 +30,6 @@ IMU::IMU(ICM20948& hardware)
       calibrandoMagnetometro(false),
 
       yawIntegrado(0.0f),
-
       headingOffset(0.0f),
 
       ultimoTempo(0),
@@ -59,30 +58,16 @@ bool IMU::begin()
 {
     dados = {};
 
-    // ---------------------------------------------------------
-    // ZERA CALIBRAÇÃO
-    // ---------------------------------------------------------
-
     gyroBiasX = 0.0f;
     gyroBiasY = 0.0f;
     gyroBiasZ = 0.0f;
 
-    // Os offsets magnéticos serão obtidos pela calibração.
     magOffsetX = 0.0f;
     magOffsetY = 0.0f;
     magOffsetZ = 0.0f;
 
-    // ---------------------------------------------------------
-    // ORIENTAÇÃO
-    // ---------------------------------------------------------
-
     yawIntegrado = 0.0f;
-
     headingOffset = 0.0f;
-
-    // ---------------------------------------------------------
-    // FILTROS
-    // ---------------------------------------------------------
 
     accelFiltradoX = 0.0f;
     accelFiltradoY = 0.0f;
@@ -96,13 +81,9 @@ bool IMU::begin()
     magFiltradoY = 0.0f;
     magFiltradoZ = 0.0f;
 
-    // ---------------------------------------------------------
-    // ESTADO
-    // ---------------------------------------------------------
+    calibrandoMagnetometro = false;
 
     primeiraAtualizacao = true;
-
-    calibrandoMagnetometro = false;
 
     ultimoTempo = micros();
 
@@ -117,70 +98,50 @@ bool IMU::begin()
 
 bool IMU::update()
 {
-    // ---------------------------------------------------------
-    // LEITURA DO HARDWARE
-    // ---------------------------------------------------------
-
-    if (!sensor.update()) {
+    if (!sensor.update())
         return false;
-    }
 
-    const ICM20948Data& bruto = sensor.getData();
+    const ICM20948Data& bruto =
+        sensor.getData();
 
-    // =========================================================
-    // PRIMEIRA LEITURA
-    // =========================================================
+    // ---------------------------------------------------------
+    // Primeira leitura
+    // ---------------------------------------------------------
 
     if (primeiraAtualizacao)
     {
-        // -----------------------------------------------------
-        // ACELERÔMETRO
-        // -----------------------------------------------------
-
         accelFiltradoX = bruto.accelX;
         accelFiltradoY = bruto.accelY;
         accelFiltradoZ = bruto.accelZ;
 
-        // -----------------------------------------------------
-        // GIROSCÓPIO
-        // -----------------------------------------------------
+        gyroFiltradoX =
+            bruto.gyroX - gyroBiasX;
 
-        gyroFiltradoX = bruto.gyroX - gyroBiasX;
-        gyroFiltradoY = bruto.gyroY - gyroBiasY;
-        gyroFiltradoZ = bruto.gyroZ - gyroBiasZ;
+        gyroFiltradoY =
+            bruto.gyroY - gyroBiasY;
 
-        // -----------------------------------------------------
-        // MAGNETÔMETRO
-        // -----------------------------------------------------
+        gyroFiltradoZ =
+            bruto.gyroZ - gyroBiasZ;
 
-        magFiltradoX = bruto.magX - magOffsetX;
-        magFiltradoY = bruto.magY - magOffsetY;
-        magFiltradoZ = bruto.magZ - magOffsetZ;
+        magFiltradoX =
+            bruto.magX - magOffsetX;
 
-        // -----------------------------------------------------
-        // ORIENTAÇÃO INICIAL
-        // -----------------------------------------------------
+        magFiltradoY =
+            bruto.magY - magOffsetY;
+
+        magFiltradoZ =
+            bruto.magZ - magOffsetZ;
 
         calcularRollPitch();
 
-        float headingMag =
-            calcularHeadingMagnetometroCompensado();
-
-        yawIntegrado = headingMag;
+        // Começamos o yaw em zero.
+        yawIntegrado = 0.0f;
 
         headingOffset = 0.0f;
-
-        // -----------------------------------------------------
-        // TEMPO
-        // -----------------------------------------------------
 
         ultimoTempo = micros();
 
         primeiraAtualizacao = false;
-
-        // -----------------------------------------------------
-        // SAÍDA
-        // -----------------------------------------------------
 
         dados.accelX = accelFiltradoX;
         dados.accelY = accelFiltradoY;
@@ -194,37 +155,38 @@ bool IMU::update()
         dados.magY = magFiltradoY;
         dados.magZ = magFiltradoZ;
 
-        dados.temperatura = bruto.temperature;
+        dados.temperatura =
+            bruto.temperature;
 
-        dados.yaw = yawIntegrado;
-
-        dados.heading =
-            normalizarAngulo(
-                yawIntegrado + headingOffset
-            );
+        dados.yaw = 0.0f;
+        dados.heading = 0.0f;
 
         return true;
     }
 
-    // =========================================================
-    // TEMPO
-    // =========================================================
+    // ---------------------------------------------------------
+    // DT
+    // ---------------------------------------------------------
 
     uint32_t agora = micros();
 
     float dt =
-        (agora - ultimoTempo) / 1000000.0f;
+        (agora - ultimoTempo) /
+        1000000.0f;
 
     ultimoTempo = agora;
 
-    // Proteção contra interrupções/bloqueios.
-    if (dt <= 0.0f || dt > 0.1f) {
+    if (
+        dt <= 0.0f ||
+        dt > 0.1f
+    )
+    {
         dt = 0.01f;
     }
 
-    // =========================================================
+    // ---------------------------------------------------------
     // ACELERÔMETRO
-    // =========================================================
+    // ---------------------------------------------------------
 
     accelFiltradoX =
         filtrar(
@@ -247,9 +209,9 @@ bool IMU::update()
             ALPHA_ACELEROMETRO
         );
 
-    // =========================================================
+    // ---------------------------------------------------------
     // GIROSCÓPIO
-    // =========================================================
+    // ---------------------------------------------------------
 
     float gyroX =
         bruto.gyroX - gyroBiasX;
@@ -281,59 +243,63 @@ bool IMU::update()
             ALPHA_GIROSCOPIO
         );
 
-    // =========================================================
+    // ---------------------------------------------------------
     // MAGNETÔMETRO
-    // =========================================================
+    // ---------------------------------------------------------
 
-    float magX =
-        bruto.magX - magOffsetX;
+    if (bruto.magDataReady)
+    {
+        float magX =
+            bruto.magX - magOffsetX;
 
-    float magY =
-        bruto.magY - magOffsetY;
+        float magY =
+            bruto.magY - magOffsetY;
 
-    float magZ =
-        bruto.magZ - magOffsetZ;
+        float magZ =
+            bruto.magZ - magOffsetZ;
 
-    magFiltradoX =
-        filtrar(
-            magFiltradoX,
-            magX,
-            ALPHA_MAGNETOMETRO
-        );
+        magFiltradoX =
+            filtrar(
+                magFiltradoX,
+                magX,
+                ALPHA_MAGNETOMETRO
+            );
 
-    magFiltradoY =
-        filtrar(
-            magFiltradoY,
-            magY,
-            ALPHA_MAGNETOMETRO
-        );
+        magFiltradoY =
+            filtrar(
+                magFiltradoY,
+                magY,
+                ALPHA_MAGNETOMETRO
+            );
 
-    magFiltradoZ =
-        filtrar(
-            magFiltradoZ,
-            magZ,
-            ALPHA_MAGNETOMETRO
-        );
+        magFiltradoZ =
+            filtrar(
+                magFiltradoZ,
+                magZ,
+                ALPHA_MAGNETOMETRO
+            );
+    }
 
-    // =========================================================
-    // CALIBRAÇÃO MAGNÉTICA
-    // =========================================================
+    // ---------------------------------------------------------
+    // Calibração magnética
+    // ---------------------------------------------------------
 
-    if (calibrandoMagnetometro) {
+    if (calibrandoMagnetometro)
+    {
         atualizarCalibracaoMagnetometro();
     }
 
-    // =========================================================
+    // ---------------------------------------------------------
     // ORIENTAÇÃO
-    // =========================================================
+    // ---------------------------------------------------------
 
     calcularRollPitch();
 
     calcularYaw(dt);
 
-    // =========================================================
+    // ---------------------------------------------------------
     // SAÍDA
-    // =========================================================
+    // ---------------------------------------------------------
 
     dados.accelX = accelFiltradoX;
     dados.accelY = accelFiltradoY;
@@ -347,25 +313,24 @@ bool IMU::update()
     dados.magY = magFiltradoY;
     dados.magZ = magFiltradoZ;
 
-    dados.temperatura = bruto.temperature;
+    dados.temperatura =
+        bruto.temperature;
 
     dados.yaw = yawIntegrado;
 
     dados.heading =
         normalizarAngulo(
-            yawIntegrado + headingOffset
+            yawIntegrado +
+            headingOffset
         );
 
-    dados.calibrada =
-        (fabsf(gyroBiasX) > 0.0f ||
-         fabsf(gyroBiasY) > 0.0f ||
-         fabsf(gyroBiasZ) > 0.0f);
+    dados.calibrada = true;
 
     return true;
 }
 
 // =============================================================
-// CALIBRAÇÃO DO GIROSCÓPIO
+// CALIBRAR GIRO
 // =============================================================
 
 bool IMU::calibrar()
@@ -376,102 +341,92 @@ bool IMU::calibrar()
     float somaY = 0.0f;
     float somaZ = 0.0f;
 
-    int amostrasValidas = 0;
+    int validas = 0;
 
-    /*
-     * O robô precisa permanecer completamente parado.
-     */
+    Serial.println();
+    Serial.println("NAO MOVA O ROBO!");
+    Serial.println("Calibrando gyro...");
+
+    delay(300);
 
     for (int i = 0; i < AMOSTRAS; i++)
     {
-        if (!sensor.update()) {
-            delay(5);
-            continue;
+        if (sensor.update())
+        {
+            const ICM20948Data& bruto =
+                sensor.getData();
+
+            somaX += bruto.gyroX;
+            somaY += bruto.gyroY;
+            somaZ += bruto.gyroZ;
+
+            validas++;
         }
-
-        const ICM20948Data& bruto =
-            sensor.getData();
-
-        somaX += bruto.gyroX;
-        somaY += bruto.gyroY;
-        somaZ += bruto.gyroZ;
-
-        amostrasValidas++;
 
         delay(5);
     }
 
-    if (amostrasValidas < 100) {
+    if (validas < 100)
+    {
+        Serial.println("ERRO: poucas amostras do gyro.");
         return false;
     }
 
-    // ---------------------------------------------------------
-    // BIAS
-    // ---------------------------------------------------------
-
     gyroBiasX =
-        somaX / amostrasValidas;
+        somaX / validas;
 
     gyroBiasY =
-        somaY / amostrasValidas;
+        somaY / validas;
 
     gyroBiasZ =
-        somaZ / amostrasValidas;
-
-    // ---------------------------------------------------------
-    // REINICIA FILTRO
-    // ---------------------------------------------------------
+        somaZ / validas;
 
     gyroFiltradoX = 0.0f;
     gyroFiltradoY = 0.0f;
     gyroFiltradoZ = 0.0f;
 
-    // ---------------------------------------------------------
-    // REINICIA TEMPO
-    // ---------------------------------------------------------
+    yawIntegrado = 0.0f;
+    headingOffset = 0.0f;
 
     ultimoTempo = micros();
 
     dados.calibrada = true;
 
+    Serial.println("Calibracao OK.");
+
+    Serial.print("Bias X: ");
+    Serial.println(gyroBiasX, 4);
+
+    Serial.print("Bias Y: ");
+    Serial.println(gyroBiasY, 4);
+
+    Serial.print("Bias Z: ");
+    Serial.println(gyroBiasZ, 4);
+
     return true;
 }
 
 // =============================================================
-// INICIAR CALIBRAÇÃO DO MAGNETÔMETRO
+// CALIBRAÇÃO MAGNÉTICA
 // =============================================================
 
 void IMU::iniciarCalibracaoMagnetometro()
 {
     calibrandoMagnetometro = true;
 
-    // Começa com extremos impossíveis.
-    magMinX =  1000000.0f;
-    magMinY =  1000000.0f;
-    magMinZ =  1000000.0f;
+    magMinX = 1000000.0f;
+    magMinY = 1000000.0f;
+    magMinZ = 1000000.0f;
 
     magMaxX = -1000000.0f;
     magMaxY = -1000000.0f;
     magMaxZ = -1000000.0f;
 }
 
-// =============================================================
-// ATUALIZAR CALIBRAÇÃO DO MAGNETÔMETRO
-// =============================================================
-
 bool IMU::atualizarCalibracaoMagnetometro()
 {
-    if (!calibrandoMagnetometro) {
+    if (!calibrandoMagnetometro)
         return false;
-    }
-
-    /*
-     * Utilizamos os dados já filtrados.
-     *
-     * Durante a calibração o robô deve ser movimentado
-     * lentamente em várias direções, permitindo que o
-     * magnetômetro observe diferentes orientações.
-     */
 
     if (magFiltradoX < magMinX)
         magMinX = magFiltradoX;
@@ -494,21 +449,12 @@ bool IMU::atualizarCalibracaoMagnetometro()
     return true;
 }
 
-// =============================================================
-// FINALIZAR CALIBRAÇÃO DO MAGNETÔMETRO
-// =============================================================
-
 bool IMU::finalizarCalibracaoMagnetometro()
 {
-    if (!calibrandoMagnetometro) {
+    if (!calibrandoMagnetometro)
         return false;
-    }
 
     calibrandoMagnetometro = false;
-
-    // ---------------------------------------------------------
-    // VERIFICA SE HOUVE MOVIMENTO SUFICIENTE
-    // ---------------------------------------------------------
 
     float amplitudeX =
         magMaxX - magMinX;
@@ -519,34 +465,26 @@ bool IMU::finalizarCalibracaoMagnetometro()
     float amplitudeZ =
         magMaxZ - magMinZ;
 
-    /*
-     * Se praticamente não houve variação, não temos
-     * informação suficiente para calcular o offset.
-     */
-
-    if (amplitudeX < 1.0f &&
+    if (
+        amplitudeX < 1.0f &&
         amplitudeY < 1.0f &&
-        amplitudeZ < 1.0f)
+        amplitudeZ < 1.0f
+    )
     {
         return false;
     }
 
-    // ---------------------------------------------------------
-    // HARD-IRON OFFSET
-    // ---------------------------------------------------------
-
     magOffsetX =
-        (magMaxX + magMinX) * 0.5f;
+        (magMaxX + magMinX) *
+        0.5f;
 
     magOffsetY =
-        (magMaxY + magMinY) * 0.5f;
+        (magMaxY + magMinY) *
+        0.5f;
 
     magOffsetZ =
-        (magMaxZ + magMinZ) * 0.5f;
-
-    // ---------------------------------------------------------
-    // REINICIA FILTRO MAGNÉTICO
-    // ---------------------------------------------------------
+        (magMaxZ + magMinZ) *
+        0.5f;
 
     magFiltradoX = 0.0f;
     magFiltradoY = 0.0f;
@@ -561,23 +499,14 @@ bool IMU::finalizarCalibracaoMagnetometro()
 
 void IMU::zerarHeading()
 {
-    /*
-     * Queremos que a orientação atual passe a ser
-     * exatamente 0 graus.
-     */
-
-    float atual =
-        normalizarAngulo(yawIntegrado);
-
-    headingOffset -= atual;
-
-    headingOffset =
-        normalizarAngulo(headingOffset);
-
     yawIntegrado = 0.0f;
+
+    headingOffset = 0.0f;
 
     dados.yaw = 0.0f;
     dados.heading = 0.0f;
+
+    ultimoTempo = micros();
 }
 
 // =============================================================
@@ -637,30 +566,28 @@ float IMU::diferencaAngular(
     float diferenca =
         alvo - atual;
 
-    while (diferenca > 180.0f) {
+    while (diferenca > 180.0f)
         diferenca -= 360.0f;
-    }
 
-    while (diferenca < -180.0f) {
+    while (diferenca < -180.0f)
         diferenca += 360.0f;
-    }
 
     return diferenca;
 }
 
 // =============================================================
-// NORMALIZAR ÂNGULO
+// NORMALIZAR
 // =============================================================
 
-float IMU::normalizarAngulo(float angulo) const
+float IMU::normalizarAngulo(
+    float angulo
+) const
 {
-    while (angulo >= 360.0f) {
+    while (angulo >= 360.0f)
         angulo -= 360.0f;
-    }
 
-    while (angulo < 0.0f) {
+    while (angulo < 0.0f)
         angulo += 360.0f;
-    }
 
     return angulo;
 }
@@ -676,7 +603,8 @@ float IMU::filtrar(
 )
 {
     return anterior +
-           alpha * (atual - anterior);
+           alpha *
+           (atual - anterior);
 }
 
 // =============================================================
@@ -685,24 +613,25 @@ float IMU::filtrar(
 
 void IMU::calcularRollPitch()
 {
-    /*
-     * A gravidade é utilizada como referência de inclinação.
-     */
-
     dados.roll =
         atan2f(
             accelFiltradoY,
             accelFiltradoZ
-        ) * GRAUS_POR_RADIANO;
+        ) *
+        GRAUS_POR_RADIANO;
 
     dados.pitch =
         atan2f(
             -accelFiltradoX,
             sqrtf(
-                accelFiltradoY * accelFiltradoY +
-                accelFiltradoZ * accelFiltradoZ
+                accelFiltradoY *
+                accelFiltradoY +
+
+                accelFiltradoZ *
+                accelFiltradoZ
             )
-        ) * GRAUS_POR_RADIANO;
+        ) *
+        GRAUS_POR_RADIANO;
 }
 
 // =============================================================
@@ -711,51 +640,35 @@ void IMU::calcularRollPitch()
 
 void IMU::calcularYaw(float dt)
 {
-    // ---------------------------------------------------------
-    // 1. INTEGRA GIROSCÓPIO
-    // ---------------------------------------------------------
-
-    float yawGyro =
-        yawIntegrado +
-        gyroFiltradoZ * dt;
-
-    yawGyro =
-        normalizarAngulo(yawGyro);
-
-    // ---------------------------------------------------------
-    // 2. HEADING MAGNÉTICO
-    // ---------------------------------------------------------
-
-    float headingMag =
-        calcularHeadingMagnetometroCompensado();
-
-    // ---------------------------------------------------------
-    // 3. DIFERENÇA ENTRE GYRO E MAG
-    // ---------------------------------------------------------
-
-    float erroMag =
-        diferencaAngular(
-            yawGyro,
-            headingMag
-        );
-
     /*
-     * O magnetômetro corrige lentamente o drift do gyro.
+     * Para navegação do robô usamos principalmente o
+     * giroscópio Z.
      *
-     * Não simplesmente substituímos o yaw pelo magnetômetro,
-     * pois isso deixaria as curvas muito ruidosas.
+     * Não aplicamos correção magnética contínua aqui.
+     *
+     * Isso é intencional:
+     *
+     * - curvas precisam responder rapidamente;
+     * - o magnetômetro pode sofrer interferência;
+     * - o controle de 90°/180° será baseado no gyro;
+     * - a calibração do gyro remove o drift inicial.
      */
 
-    yawIntegrado =
-        yawGyro +
-        ALPHA_YAW_MAG * erroMag;
+    yawIntegrado +=
+        gyroFiltradoZ *
+        SINAL_YAW *
+        dt;
 
-    yawIntegrado =
-        normalizarAngulo(yawIntegrado);
+    // Mantém yaw em uma faixa confortável.
+    while (yawIntegrado >= 360.0f)
+        yawIntegrado -= 360.0f;
+
+    while (yawIntegrado < 0.0f)
+        yawIntegrado += 360.0f;
 }
 
 // =============================================================
-// HEADING MAGNÉTICO BÁSICO
+// HEADING MAGNÉTICO
 // =============================================================
 
 float IMU::calcularHeadingMagnetometro() const
@@ -764,30 +677,25 @@ float IMU::calcularHeadingMagnetometro() const
         atan2f(
             magFiltradoY,
             magFiltradoX
-        ) * GRAUS_POR_RADIANO;
+        ) *
+        GRAUS_POR_RADIANO;
 
     return normalizarAngulo(heading);
 }
 
 // =============================================================
-// HEADING MAGNÉTICO COMPENSADO PELA INCLINAÇÃO
+// HEADING MAGNÉTICO COMPENSADO
 // =============================================================
 
 float IMU::calcularHeadingMagnetometroCompensado() const
 {
-    /*
-     * Compensação de inclinação.
-     *
-     * O magnetômetro não deve simplesmente usar X/Y se o
-     * sensor estiver inclinado. Roll e pitch são utilizados
-     * para projetar o campo magnético no plano horizontal.
-     */
-
     float roll =
-        dados.roll / GRAUS_POR_RADIANO;
+        dados.roll /
+        GRAUS_POR_RADIANO;
 
     float pitch =
-        dados.pitch / GRAUS_POR_RADIANO;
+        dados.pitch /
+        GRAUS_POR_RADIANO;
 
     float sr = sinf(roll);
     float cr = cosf(roll);
@@ -808,9 +716,8 @@ float IMU::calcularHeadingMagnetometroCompensado() const
         atan2f(
             Yh,
             Xh
-        ) * GRAUS_POR_RADIANO;
+        ) *
+        GRAUS_POR_RADIANO;
 
-    return normalizarAngulo(
-        heading
-    );
+    return normalizarAngulo(heading);
 }
