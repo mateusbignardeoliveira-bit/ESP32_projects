@@ -1,7 +1,8 @@
 #ifndef AS7341_ANALISE_H
 #define AS7341_ANALISE_H
 
-#include "hardware/AS7341.h"
+#include <Arduino.h>
+#include "../Hardware/AS7341.h"
 
 
 // ============================================================
@@ -12,53 +13,29 @@ struct AS7341Resultado
 {
     bool valido;
 
-
-    // ========================================================
-    // INTENSIDADE GERAL
-    // ========================================================
-
+    // Intensidade geral
     float intensidade;
 
-
-    // ========================================================
-    // COMPONENTES ESPECTRAIS AGRUPADOS
-    // ========================================================
-
+    // Componentes espectrais agrupados
     float azul;
     float verde;
     float vermelho;
 
-
-    // ========================================================
-    // RELAÇÕES ENTRE COMPONENTES
-    // ========================================================
-
+    // Relações espectrais
     float razaoVermelhoVerde;
     float razaoAzulVerde;
-
     float razaoNIR;
 
-
-    // ========================================================
-    // CANAL DOMINANTE
-    //
+    // Canal dominante
     // 0 = inválido
     // 1 = azul
     // 2 = verde
     // 3 = vermelho
-    // ========================================================
-
     uint8_t canalDominante;
 
-
-    // ========================================================
-    // DETECÇÃO DE CORES
-    // ========================================================
-
+    // Detecção de cores
     bool verdeDetectado;
-
     bool vermelhoDetectado;
-
     bool cinzaDetectado;
 };
 
@@ -93,19 +70,9 @@ public:
 
     AS7341Analise();
 
-
-    // ========================================================
-    // ANALISA UM SENSOR
-    // ========================================================
-
     AS7341Resultado analisar(
         const AS7341Data& dados
     );
-
-
-    // ========================================================
-    // COMPARA DIREITA / ESQUERDA
-    // ========================================================
 
     AS7341Comparacao comparar(
         const AS7341Resultado& direita,
@@ -115,29 +82,21 @@ public:
 
 private:
 
-    // ========================================================
-    // CÁLCULOS
-    // ========================================================
-
     float calcularIntensidade(
         const AS7341Data& dados
     );
-
 
     float calcularAzul(
         const AS7341Data& dados
     );
 
-
     float calcularVerde(
         const AS7341Data& dados
     );
 
-
     float calcularVermelho(
         const AS7341Data& dados
     );
-
 
     uint8_t descobrirCanalDominante(
         float azul,
@@ -145,20 +104,13 @@ private:
         float vermelho
     );
 
-
-    // ========================================================
-    // DETECÇÃO DE CORES
-    // ========================================================
-
     bool detectarVerde(
         const AS7341Data& dados
     );
 
-
     bool detectarVermelho(
         const AS7341Data& dados
     );
-
 
     bool detectarCinza(
         const AS7341Data& dados

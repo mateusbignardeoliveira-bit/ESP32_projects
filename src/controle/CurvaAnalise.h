@@ -3,32 +3,40 @@
 
 #include <Arduino.h>
 
-#include "sensores/LinhaAnalise.h"
+#include "../sensores/LinhaAnalise.h"
 
 
 // ============================================================
-// DIREÇÃO
+// TENDÊNCIA DA LINHA
 // ============================================================
 
-enum DirecaoCurva
+enum TendenciaLinha
 {
-    CURVA_NENHUMA,
-    CURVA_ESQUERDA,
-    CURVA_DIREITA
+    TENDENCIA_NENHUMA,
+
+    TENDENCIA_ESQUERDA,
+
+    TENDENCIA_DIREITA
 };
 
 
 // ============================================================
-// DADOS DA ANÁLISE DA REGIÃO DA LINHA
+// DADOS DA ANÁLISE
 // ============================================================
 
 struct CurvaData
 {
+
     // --------------------------------------------------------
-    // Quantidade de sensores pretos
+    // Quantidade total de sensores pretos
     // --------------------------------------------------------
 
     int sensoresPretos;
+
+
+    // --------------------------------------------------------
+    // Sensores pretos de cada lado
+    // --------------------------------------------------------
 
     int sensoresEsquerda;
 
@@ -36,39 +44,55 @@ struct CurvaData
 
 
     // --------------------------------------------------------
-    // Características da linha
+    // Centro da linha
     // --------------------------------------------------------
 
     bool linhaCentral;
 
+
+    // --------------------------------------------------------
+    // Linha ocupando vários sensores
+    // --------------------------------------------------------
+
     bool linhaLarga;
+
+
+    // --------------------------------------------------------
+    // Todos os sensores brancos
+    // --------------------------------------------------------
 
     bool todosBrancos;
 
 
     // --------------------------------------------------------
-    // Entrada na avaliação especial
+    // 4 ou mais sensores pretos
+    //
+    // Indica que deve começar a avaliação especial.
     // --------------------------------------------------------
 
     bool avaliacaoEspecial;
 
 
     // --------------------------------------------------------
-    // Compatibilidade temporária
-    //
-    // Estes campos ainda existem porque o Main antigo
-    // utiliza CurvaData.
-    //
-    // Eles NÃO serão usados para decidir curvas.
-    // Serão removidos quando o novo sistema de decisão
-    // estiver integrado.
+    // Tendência antes da avaliação especial
     // --------------------------------------------------------
 
-    bool curva90;
+    TendenciaLinha tendenciaAntesAvaliacao;
 
-    DirecaoCurva direcao;
+
+    // --------------------------------------------------------
+    // Quantidade de sensores de cada lado no momento
+    // --------------------------------------------------------
+
+    int maiorQuantidadeLado;
+
+
+    // --------------------------------------------------------
+    // Compatibilidade / informação adicional
+    // --------------------------------------------------------
 
     bool cruzamento;
+
 };
 
 
@@ -78,63 +102,108 @@ struct CurvaData
 
 class CurvaAnalise
 {
+
 private:
 
-    // --------------------------------------------------------
-    // Sensor considerado preto
-    // --------------------------------------------------------
+    // ========================================================
+    // LIMIAR DE SENSOR PRETO
+    // ========================================================
 
-    static constexpr float LIMIAR_PRETO = 0.35f;
-
-
-    // --------------------------------------------------------
-    // Quantidade de pretos para iniciar avaliação especial
-    // --------------------------------------------------------
-
-    static constexpr int MINIMO_PRETOS_AVALIACAO = 4;
+    const float LIMIAR_PRETO =
+        0.35f;
 
 
-    // --------------------------------------------------------
-    // Sensores centrais
+    // ========================================================
+    // LIMIAR PARA CONSIDERAR TENDÊNCIA
+    // ========================================================
+
+    const int MINIMO_SENSORES_TENDENCIA =
+        2;
+
+
+    // ========================================================
+    // QUANTIDADE PARA AVALIAÇÃO ESPECIAL
+    // ========================================================
+
+    const int MINIMO_PRETOS_AVALIACAO =
+        4;
+
+
+    // ========================================================
+    // SENSORES CENTRAIS
     //
-    // Array:
-    //
-    // s1 s2 s3 s4 s5 s6 s7 s8
-    //
-    // Centro:
-    // s4 e s5
-    // --------------------------------------------------------
+    // 0 1 2 3 4 5 6 7
+    //       ↑ ↑
+    //       centro
+    // ========================================================
 
-    static constexpr int SENSOR_CENTRO_ESQUERDO = 3;
-    static constexpr int SENSOR_CENTRO_DIREITO = 4;
+    const int SENSOR_CENTRO_ESQUERDO =
+        3;
+
+    const int SENSOR_CENTRO_DIREITO =
+        4;
 
 
-    // --------------------------------------------------------
-    // Resultado atual
-    // --------------------------------------------------------
+    // ========================================================
+    // DADOS
+    // ========================================================
 
     CurvaData resultado;
 
 
+    // ========================================================
+    // MEMÓRIA DA TENDÊNCIA
+    // ========================================================
+
+    TendenciaLinha tendenciaAtual;
+
+    TendenciaLinha tendenciaAnterior;
+
+
+    // ========================================================
+    // FUNÇÃO INTERNA
+    // ========================================================
+
+    TendenciaLinha calcularTendencia(
+        int sensoresEsquerda,
+        int sensoresDireita
+    );
+
+
 public:
+
+    // ========================================================
+    // CONSTRUTOR
+    // ========================================================
 
     CurvaAnalise();
 
 
-    // --------------------------------------------------------
-    // Atualiza análise
-    // --------------------------------------------------------
+    // ========================================================
+    // ATUALIZA
+    // ========================================================
 
     void update(
         const LinhaData& linha
     );
 
 
-    // --------------------------------------------------------
-    // Retorna resultado
-    // --------------------------------------------------------
+    // ========================================================
+    // DADOS
+    // ========================================================
 
     CurvaData getData();
+
+
+    // ========================================================
+    // TENDÊNCIA
+    // ========================================================
+
+    TendenciaLinha getTendencia();
+
+
+    TendenciaLinha getTendenciaAnterior();
+
 };
 
 #endif

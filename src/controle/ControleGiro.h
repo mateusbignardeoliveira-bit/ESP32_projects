@@ -3,26 +3,122 @@
 
 #include <Arduino.h>
 
-#include "sensores/IMU.h"
-#include "hardware/MotorControlador.h"
+#include "../Hardware/MotorControlador.h"
+#include "../sensores/IMU.h"
+
 
 class ControleGiro
 {
+
+private:
+
+    // ========================================================
+    // Referências
+    // ========================================================
+
+    IMU& sensorIMU;
+    MotorControlador& motores;
+
+
+    // ========================================================
+    // Estado
+    // ========================================================
+
+    bool emExecucao;
+    bool movimentoConcluido;
+
+
+    // ========================================================
+    // Giro atual
+    // ========================================================
+
+    float headingInicial;
+    float headingAlvo;
+    float anguloSolicitado;
+
+
+    // ========================================================
+    // PID do giro
+    // ========================================================
+
+    float kp;
+    float ki;
+    float kd;
+
+    float erroAnterior;
+    float integral;
+
+    unsigned long ultimoTempo;
+
+
+    // ========================================================
+    // Limites de motor
+    // ========================================================
+
+    int velocidadeMaxima;
+    int velocidadeMinima;
+
+
+    // ========================================================
+    // Finalização
+    // ========================================================
+
+    float tolerancia;
+    unsigned long tempoEstabilizacao;
+    unsigned long inicioEstabilizacao;
+
+
+    // ========================================================
+    // Calcula erro angular assinado
+    //
+    // Resultado:
+    //
+    // positivo = virar para direita
+    // negativo = virar para esquerda
+    // ========================================================
+
+    float calcularErroAngular(
+        float atual,
+        float alvo
+    );
+
+
+    // ========================================================
+    // Finaliza movimento
+    // ========================================================
+
+    void finalizar();
+
+
 public:
+
+    // ========================================================
+    // Construtor
+    // ========================================================
 
     ControleGiro(
         IMU& imu,
-        MotorControlador& motores
+        MotorControlador& motorControlador
     );
+
+
+    // ========================================================
+    // Inicialização
+    // ========================================================
 
     void begin();
 
-    // Deve ser chamado continuamente.
+
+    // ========================================================
+    // Atualiza controle do giro
+    // ========================================================
+
     void update();
 
-    // ---------------------------------------------------------
-    // MANOBRAS
-    // ---------------------------------------------------------
+
+    // ========================================================
+    // Comandos de giro
+    // ========================================================
 
     void curva90Direita();
 
@@ -32,75 +128,43 @@ public:
 
     void girar(float angulo);
 
-    // ---------------------------------------------------------
-    // ESTADO
-    // ---------------------------------------------------------
 
-    bool executando() const;
+    // ========================================================
+    // Estado
+    // ========================================================
 
-    bool terminou() const;
+    bool executando();
+
+    bool terminou();
+
+
+    // ========================================================
+    // Cancela movimento atual
+    // ========================================================
 
     void cancelar();
 
-    // ---------------------------------------------------------
-    // CONFIGURAÇÃO
-    // ---------------------------------------------------------
 
-    void setVelocidade(int velocidade);
+    // ========================================================
+    // Parâmetros
+    // ========================================================
 
-    void setVelocidadeMinima(int velocidade);
+    void setKp(float valor);
 
-    void setKp(float kp);
+    void setKi(float valor);
 
-    void setKd(float kd);
+    void setKd(float valor);
 
-    void setTolerancia(float graus);
+    void setVelocidadeMaxima(int valor);
 
-private:
+    void setVelocidadeMinima(int valor);
 
-    IMU& sensorIMU;
+    void setTolerancia(float valor);
 
-    MotorControlador& controladorMotores;
-
-    bool emCurva;
-
-    bool curvaTerminada;
-
-    float anguloAlvo;
-
-    float erroAnterior;
-
-    uint32_t ultimoTempo;
-
-    uint32_t entrouNaTolerancia;
-
-    int velocidadeMaxima;
-
-    int velocidadeMinima;
-
-    float kp;
-
-    float kd;
-
-    float tolerancia;
-
-    uint32_t tempoEstabilizacao;
-
-    float calcularErro() const;
-
-    void controlarMotores(
-        float erro
+    void setTempoEstabilizacao(
+        unsigned long tempo
     );
 
-    void pararMotores();
-
-    bool chegouAoAlvo();
-
-    float limitar(
-        float valor,
-        float minimo,
-        float maximo
-    ) const;
 };
 
 #endif

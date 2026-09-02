@@ -2,10 +2,10 @@
 
 
 // ============================================================
-// CALIBRAÇÃO DA DETECÇÃO DE VERDE
+// LIMIARES DE VERDE
 // ============================================================
 //
-// Baseado nas leituras reais do robô:
+// Leituras reais utilizadas no projeto:
 //
 // VERDE:
 // F4/F3 ≈ 2.3 ~ 2.65
@@ -19,7 +19,7 @@
 // F4/F3 ≈ 1.10 ~ 1.41
 // F4/F6 ≈ 0.57 ~ 0.68
 //
-// Mantemos a margem atualmente utilizada pelo projeto.
+// Mantemos margem de segurança.
 //
 
 static const float LIMIAR_F4_F3 = 1.80f;
@@ -49,7 +49,6 @@ float AS7341Analise::calcularIntensidade(
         return 0.0f;
     }
 
-
     return (float)dados.clear;
 }
 
@@ -66,10 +65,6 @@ float AS7341Analise::calcularAzul(
     {
         return 0.0f;
     }
-
-
-    // F1 e F2 possuem maior resposta
-    // na região azul.
 
     return (
         (float)dados.F1 +
@@ -91,9 +86,6 @@ float AS7341Analise::calcularVerde(
         return 0.0f;
     }
 
-
-    // F3 e F4 ficam na região verde.
-
     return (
         (float)dados.F3 +
         (float)dados.F4
@@ -114,10 +106,6 @@ float AS7341Analise::calcularVermelho(
         return 0.0f;
     }
 
-
-    // F6 e F7 possuem forte resposta
-    // na região vermelho / vermelho profundo.
-
     return (
         (float)dados.F6 +
         (float)dados.F7
@@ -134,7 +122,6 @@ float AS7341Analise::calcularVermelho(
 // 2 = verde
 // 3 = vermelho
 //
-// ============================================================
 
 uint8_t AS7341Analise::descobrirCanalDominante(
     float azul,
@@ -143,13 +130,21 @@ uint8_t AS7341Analise::descobrirCanalDominante(
 )
 {
     if(
+        azul <= 0.0f &&
+        verde <= 0.0f &&
+        vermelho <= 0.0f
+    )
+    {
+        return 0;
+    }
+
+    if(
         azul >= verde &&
         azul >= vermelho
     )
     {
         return 1;
     }
-
 
     if(
         verde >= azul &&
@@ -159,7 +154,6 @@ uint8_t AS7341Analise::descobrirCanalDominante(
         return 2;
     }
 
-
     return 3;
 }
 
@@ -168,7 +162,7 @@ uint8_t AS7341Analise::descobrirCanalDominante(
 // DETECTAR VERDE
 // ============================================================
 //
-// A detecção utiliza:
+// Utilizamos duas relações:
 //
 // F4/F3
 //
@@ -188,22 +182,9 @@ bool AS7341Analise::detectarVerde(
         return false;
     }
 
-
-    const float f3 =
-        (float)dados.F3;
-
-
-    const float f4 =
-        (float)dados.F4;
-
-
-    const float f6 =
-        (float)dados.F6;
-
-
-    // --------------------------------------------------------
-    // Evita divisão por zero
-    // --------------------------------------------------------
+    const float f3 = (float)dados.F3;
+    const float f4 = (float)dados.F4;
+    const float f6 = (float)dados.F6;
 
     if(
         f3 <= 0.0f ||
@@ -213,33 +194,16 @@ bool AS7341Analise::detectarVerde(
         return false;
     }
 
-
-    // --------------------------------------------------------
-    // Razões espectrais
-    // --------------------------------------------------------
-
     const float razaoF4F3 =
         f4 / f3;
-
 
     const float razaoF4F6 =
         f4 / f6;
 
-
-    // --------------------------------------------------------
-    // Detecção
-    // --------------------------------------------------------
-
-    if(
+    return (
         razaoF4F3 > LIMIAR_F4_F3 &&
         razaoF4F6 > LIMIAR_F4_F6
-    )
-    {
-        return true;
-    }
-
-
-    return false;
+    );
 }
 
 
@@ -247,23 +211,11 @@ bool AS7341Analise::detectarVerde(
 // DETECTAR VERMELHO
 // ============================================================
 //
-// A estrutura da detecção já existe.
+// Ainda não ativado.
 //
-// Porém ainda NÃO colocamos um limiar arbitrário.
+// Não vamos criar um limiar arbitrário sem as leituras reais
+// do material vermelho utilizado na pista.
 //
-// Precisamos usar as leituras reais do seu robô para definir
-// a separação entre:
-//
-// - vermelho
-// - branco
-// - preto
-// - verde
-//
-// Portanto, nesta etapa:
-//
-// false = detecção ainda não calibrada.
-//
-// ============================================================
 
 bool AS7341Analise::detectarVermelho(
     const AS7341Data& dados
@@ -274,23 +226,6 @@ bool AS7341Analise::detectarVermelho(
         return false;
     }
 
-
-    // --------------------------------------------------------
-    // NÃO ATIVAR AINDA
-    // --------------------------------------------------------
-    //
-    // O cálculo de vermelho já está disponível em:
-    //
-    // dados.F6
-    // dados.F7
-    //
-    // e também em:
-    //
-    // resultado.vermelho
-    //
-    // A decisão será adicionada depois das medições reais.
-    //
-
     return false;
 }
 
@@ -299,22 +234,15 @@ bool AS7341Analise::detectarVermelho(
 // DETECTAR CINZA
 // ============================================================
 //
-// Cinza também não deve ser identificado simplesmente por:
+// Ainda não ativado.
 //
-// "vermelho baixo"
-// "verde baixo"
-// "azul baixo"
-//
-// Isso poderia confundir:
+// Cinza precisa ser separado de:
 //
 // - preto
 // - branco
-// - cinza
+// - verde
 //
-// Por isso precisamos das leituras reais do sensor sobre o
-// material cinza usado na pista.
-//
-// Nesta etapa a função existe, mas permanece desativada.
+// usando as leituras reais do material.
 //
 
 bool AS7341Analise::detectarCinza(
@@ -325,11 +253,6 @@ bool AS7341Analise::detectarCinza(
     {
         return false;
     }
-
-
-    // --------------------------------------------------------
-    // NÃO ATIVAR AINDA
-    // --------------------------------------------------------
 
     return false;
 }
@@ -344,11 +267,6 @@ AS7341Resultado AS7341Analise::analisar(
 )
 {
     AS7341Resultado resultado;
-
-
-    // ========================================================
-    // INICIALIZAÇÃO SEGURA
-    // ========================================================
 
     resultado.valido = false;
 
@@ -375,9 +293,9 @@ AS7341Resultado AS7341Analise::analisar(
     resultado.cinzaDetectado = false;
 
 
-    // ========================================================
+    // --------------------------------------------------------
     // SENSOR INVÁLIDO
-    // ========================================================
+    // --------------------------------------------------------
 
     if(!dados.valido)
     {
@@ -388,98 +306,62 @@ AS7341Resultado AS7341Analise::analisar(
     resultado.valido = true;
 
 
-    // ========================================================
-    // INTENSIDADE
-    // ========================================================
+    // --------------------------------------------------------
+    // COMPONENTES
+    // --------------------------------------------------------
 
     resultado.intensidade =
-        calcularIntensidade(
-            dados
-        );
-
-
-    // ========================================================
-    // COMPONENTES
-    // ========================================================
+        calcularIntensidade(dados);
 
     resultado.azul =
-        calcularAzul(
-            dados
-        );
-
+        calcularAzul(dados);
 
     resultado.verde =
-        calcularVerde(
-            dados
-        );
-
+        calcularVerde(dados);
 
     resultado.vermelho =
-        calcularVermelho(
-            dados
-        );
+        calcularVermelho(dados);
 
 
-    // ========================================================
+    // --------------------------------------------------------
     // RAZÃO VERMELHO / VERDE
-    // ========================================================
+    // --------------------------------------------------------
 
-    if(
-        resultado.verde > 0.0f
-    )
+    if(resultado.verde > 0.0f)
     {
         resultado.razaoVermelhoVerde =
             resultado.vermelho /
             resultado.verde;
     }
-    else
-    {
-        resultado.razaoVermelhoVerde =
-            0.0f;
-    }
 
 
-    // ========================================================
+    // --------------------------------------------------------
     // RAZÃO AZUL / VERDE
-    // ========================================================
+    // --------------------------------------------------------
 
-    if(
-        resultado.verde > 0.0f
-    )
+    if(resultado.verde > 0.0f)
     {
         resultado.razaoAzulVerde =
             resultado.azul /
             resultado.verde;
     }
-    else
-    {
-        resultado.razaoAzulVerde =
-            0.0f;
-    }
 
 
-    // ========================================================
+    // --------------------------------------------------------
     // RAZÃO NIR / CLEAR
-    // ========================================================
+    // --------------------------------------------------------
 
-    if(
-        dados.clear > 0
-    )
+    if(dados.clear > 0)
     {
         resultado.razaoNIR =
             (float)dados.nir /
             (float)dados.clear;
     }
-    else
-    {
-        resultado.razaoNIR =
-            0.0f;
-    }
 
 
-    // ========================================================
+    // --------------------------------------------------------
     // CANAL DOMINANTE
-    // ========================================================
+    // --------------------------------------------------------
 
     resultado.canalDominante =
         descobrirCanalDominante(
@@ -489,34 +371,18 @@ AS7341Resultado AS7341Analise::analisar(
         );
 
 
-    // ========================================================
-    // VERDE
-    // ========================================================
+    // --------------------------------------------------------
+    // DETECÇÃO DE CORES
+    // --------------------------------------------------------
 
     resultado.verdeDetectado =
-        detectarVerde(
-            dados
-        );
-
-
-    // ========================================================
-    // VERMELHO
-    // ========================================================
+        detectarVerde(dados);
 
     resultado.vermelhoDetectado =
-        detectarVermelho(
-            dados
-        );
-
-
-    // ========================================================
-    // CINZA
-    // ========================================================
+        detectarVermelho(dados);
 
     resultado.cinzaDetectado =
-        detectarCinza(
-            dados
-        );
+        detectarCinza(dados);
 
 
     return resultado;
@@ -534,36 +400,29 @@ AS7341Comparacao AS7341Analise::comparar(
 {
     AS7341Comparacao resultado;
 
-
     resultado.diferencaIntensidade =
         direita.intensidade -
         esquerda.intensidade;
-
 
     resultado.diferencaVermelho =
         direita.vermelho -
         esquerda.vermelho;
 
-
     resultado.diferencaVerde =
         direita.verde -
         esquerda.verde;
-
 
     resultado.diferencaAzul =
         direita.azul -
         esquerda.azul;
 
-
     resultado.direitaMaisIntensa =
         direita.intensidade >
         esquerda.intensidade;
 
-
     resultado.esquerdaMaisIntensa =
         esquerda.intensidade >
         direita.intensidade;
-
 
     return resultado;
 }

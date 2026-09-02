@@ -21,41 +21,29 @@ Verde::Verde(
 
 void Verde::reset()
 {
-    resultado.avaliando =
-        false;
+    resultado.avaliando = false;
 
-    resultado.finalizada =
-        false;
+    resultado.finalizada = false;
 
-    resultado.verdeEsquerda =
-        false;
+    resultado.verdeEsquerda = false;
 
-    resultado.verdeDireita =
-        false;
+    resultado.verdeDireita = false;
 
-    resultado.vermelhoEsquerda =
-        false;
+    resultado.vermelhoEsquerda = false;
 
-    resultado.vermelhoDireita =
-        false;
+    resultado.vermelhoDireita = false;
 
-    resultado.cinzaEsquerda =
-        false;
+    resultado.cinzaEsquerda = false;
 
-    resultado.cinzaDireita =
-        false;
+    resultado.cinzaDireita = false;
 
-    resultado.maiorQuantidadePretos =
-        0;
+    resultado.maiorQuantidadePretos = 0;
 
-    resultado.encontrouAmbosLados =
-        false;
+    resultado.encontrouAmbosLados = false;
 
-    resultado.encontrouVermelho =
-        false;
+    resultado.encontrouVermelho = false;
 
-    resultado.encontrouCinza =
-        false;
+    resultado.encontrouCinza = false;
 }
 
 
@@ -69,15 +57,10 @@ void Verde::iniciar(
 {
     reset();
 
-    resultado.avaliando =
-        true;
+    resultado.avaliando = true;
 
     resultado.maiorQuantidadePretos =
         quantidadePretosInicial;
-
-    Serial.println(
-        "INICIO DA AVALIACAO DE COR"
-    );
 }
 
 
@@ -91,9 +74,7 @@ void Verde::update(
     int quantidadePretos
 )
 {
-    if(
-        !resultado.avaliando
-    )
+    if(!resultado.avaliando)
     {
         return;
     }
@@ -124,20 +105,11 @@ void Verde::update(
     // ========================================================
 
     if(
+        esquerda.valido &&
         esquerda.verdeDetectado
     )
     {
-        if(
-            !resultado.verdeEsquerda
-        )
-        {
-            Serial.println(
-                "VERDE ESQUERDA"
-            );
-        }
-
-        resultado.verdeEsquerda =
-            true;
+        resultado.verdeEsquerda = true;
     }
 
 
@@ -146,20 +118,39 @@ void Verde::update(
     // ========================================================
 
     if(
+        direita.valido &&
         direita.verdeDetectado
     )
     {
-        if(
-            !resultado.verdeDireita
-        )
-        {
-            Serial.println(
-                "VERDE DIREITA"
-            );
-        }
+        resultado.verdeDireita = true;
+    }
 
-        resultado.verdeDireita =
-            true;
+
+    // ========================================================
+    // VERDE NOS DOIS LADOS
+    // ========================================================
+    //
+    // Não precisa ser simultâneo.
+    //
+    // Exemplo:
+    //
+    // instante 1 -> verde esquerda
+    // instante 20 -> verde direita
+    //
+    // Resultado:
+    //
+    // encontrouAmbosLados = true
+    //
+    // A camada de decisão posteriormente interpreta isso
+    // como uma curva de 180 graus.
+    //
+
+    if(
+        resultado.verdeEsquerda &&
+        resultado.verdeDireita
+    )
+    {
+        resultado.encontrouAmbosLados = true;
     }
 
 
@@ -168,14 +159,13 @@ void Verde::update(
     // ========================================================
 
     if(
+        esquerda.valido &&
         esquerda.vermelhoDetectado
     )
     {
-        resultado.vermelhoEsquerda =
-            true;
+        resultado.vermelhoEsquerda = true;
 
-        resultado.encontrouVermelho =
-            true;
+        resultado.encontrouVermelho = true;
     }
 
 
@@ -184,14 +174,13 @@ void Verde::update(
     // ========================================================
 
     if(
+        direita.valido &&
         direita.vermelhoDetectado
     )
     {
-        resultado.vermelhoDireita =
-            true;
+        resultado.vermelhoDireita = true;
 
-        resultado.encontrouVermelho =
-            true;
+        resultado.encontrouVermelho = true;
     }
 
 
@@ -200,14 +189,13 @@ void Verde::update(
     // ========================================================
 
     if(
+        esquerda.valido &&
         esquerda.cinzaDetectado
     )
     {
-        resultado.cinzaEsquerda =
-            true;
+        resultado.cinzaEsquerda = true;
 
-        resultado.encontrouCinza =
-            true;
+        resultado.encontrouCinza = true;
     }
 
 
@@ -216,52 +204,18 @@ void Verde::update(
     // ========================================================
 
     if(
+        direita.valido &&
         direita.cinzaDetectado
     )
     {
-        resultado.cinzaDireita =
-            true;
+        resultado.cinzaDireita = true;
 
-        resultado.encontrouCinza =
-            true;
+        resultado.encontrouCinza = true;
     }
 
 
     // ========================================================
-    // AMBOS OS LADOS
-    // ========================================================
-    //
-    // IMPORTANTE:
-    //
-    // Não precisa acontecer simultaneamente.
-    //
-    // Exemplo:
-    //
-    // leitura 1:
-    // verde esquerda
-    //
-    // leitura 20:
-    // verde direita
-    //
-    // resultado:
-    //
-    // encontrouAmbosLados = true
-    //
-    // Isso será interpretado depois como 180°.
-    // ========================================================
-
-    if(
-        resultado.verdeEsquerda &&
-        resultado.verdeDireita
-    )
-    {
-        resultado.encontrouAmbosLados =
-            true;
-    }
-
-
-    // ========================================================
-    // GUARDA MAIOR QUANTIDADE DE PRETOS
+    // MAIOR QUANTIDADE DE PRETOS
     // ========================================================
 
     if(
@@ -281,69 +235,14 @@ void Verde::update(
 
 void Verde::finalizar()
 {
-    if(
-        !resultado.avaliando
-    )
+    if(!resultado.avaliando)
     {
         return;
     }
 
+    resultado.avaliando = false;
 
-    resultado.avaliando =
-        false;
-
-    resultado.finalizada =
-        true;
-
-
-    Serial.println(
-        "AVALIACAO DE COR FINALIZADA"
-    );
-
-
-    Serial.print(
-        "VERDE ESQUERDA: "
-    );
-
-    Serial.println(
-        resultado.verdeEsquerda
-    );
-
-
-    Serial.print(
-        "VERDE DIREITA: "
-    );
-
-    Serial.println(
-        resultado.verdeDireita
-    );
-
-
-    Serial.print(
-        "VERMELHO: "
-    );
-
-    Serial.println(
-        resultado.encontrouVermelho
-    );
-
-
-    Serial.print(
-        "CINZA: "
-    );
-
-    Serial.println(
-        resultado.encontrouCinza
-    );
-
-
-    Serial.print(
-        "MAIOR NUMERO DE PRETOS: "
-    );
-
-    Serial.println(
-        resultado.maiorQuantidadePretos
-    );
+    resultado.finalizada = true;
 }
 
 
