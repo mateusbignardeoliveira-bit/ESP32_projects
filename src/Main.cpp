@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <Wire.h>
 
 #include "Hardware/TCA.h"
 #include "Hardware/AS7341.h"
@@ -23,17 +24,49 @@
 
 
 // ============================================================
-// PINOS
+// CONFIGURAÇÃO DE PINOS
 // ============================================================
 
-// I2C principal
-static constexpr int PINO_SDA = 19;
-static constexpr int PINO_SCL = 23;
+// ------------------------------------------------------------
+// I2C do TCA9548A
+//
+// Usa o Wire principal do ESP32.
+// O TCA fica neste barramento.
+//
+// Pinos padrão do Wire:
+// SDA = GPIO21
+// SCL = GPIO22
+// ------------------------------------------------------------
 
-// Interruptor geral
+
+// ------------------------------------------------------------
+// I2C EXCLUSIVO DO ICM-20948
+//
+// O ICM NÃO passa pelo TCA.
+//
+// SDA = GPIO19
+// SCL = GPIO23
+// ------------------------------------------------------------
+
+static constexpr int ICM_SDA = 19;
+static constexpr int ICM_SCL = 23;
+
+
+// ------------------------------------------------------------
+// Botão / interruptor de segurança
+//
+// LOW = parar robô
+//
+// Quando acionado, o robô permanece parado até reiniciar.
+// ------------------------------------------------------------
+
 static constexpr int PINO_INTERRUPTOR = 32;
 
+
+// ------------------------------------------------------------
 // ARGB
+// ------------------------------------------------------------
+
 static constexpr int PINO_ARGB = 25;
 
 
@@ -41,28 +74,41 @@ static constexpr int PINO_ARGB = 25;
 // UART
 // ============================================================
 
+// ------------------------------------------------------------
 // Array de linha
-// RX = 16
-// TX = 17
+// ------------------------------------------------------------
+
 static constexpr int ARRAY_RX = 16;
 static constexpr int ARRAY_TX = 17;
 
-// Yahboom
-// RX = 18
-// TX = 5
+
+// ------------------------------------------------------------
+// Controlador Yahboom
+// ------------------------------------------------------------
+//
+// RX ESP32 = GPIO18
+// TX ESP32 = GPIO5
+// ------------------------------------------------------------
+
 static constexpr int MOTOR_RX = 18;
 static constexpr int MOTOR_TX = 5;
 
 
 // ============================================================
-// TCA
+// TCA9548A
 // ============================================================
+
+// ------------------------------------------------------------
+// Canal 0 = ToF
+// Canal 1 = AS7341 direita
+// Canal 2 = AS7341 esquerda
+// ------------------------------------------------------------
 
 static constexpr uint8_t CANAL_TOF = 0;
 
 
 // ============================================================
-// VELOCIDADES DOS CONTROLES
+// PARÂMETROS GERAIS
 // ============================================================
 
 static constexpr int VELOCIDADE_LINHA = 200;
@@ -72,9 +118,25 @@ static constexpr int VELOCIDADE_LINHA = 200;
 // OBJETOS DE HARDWARE
 // ============================================================
 
+// ------------------------------------------------------------
+// TCA
+// ------------------------------------------------------------
+
 TCA tca;
 
-AS7341Sensores sensoresCor(tca);
+
+// ------------------------------------------------------------
+// Sensores AS7341
+// ------------------------------------------------------------
+
+AS7341Sensores sensoresCor(
+    tca
+);
+
+
+// ------------------------------------------------------------
+// Array de linha
+// ------------------------------------------------------------
 
 ArrayLinha arrayLinha(
     Serial2,
@@ -83,7 +145,37 @@ ArrayLinha arrayLinha(
     115200
 );
 
-ICM20948 icm;
+
+// ------------------------------------------------------------
+// Barramento I2C exclusivo do ICM
+// ------------------------------------------------------------
+//
+// IMPORTANTE:
+//
+// O TCA usa o Wire principal.
+//
+// O ICM usa outro controlador I2C,
+// permitindo trabalhar nos GPIO19/23
+// sem alterar o barramento do TCA.
+// ------------------------------------------------------------
+
+TwoWire I2C_ICM(
+    1
+);
+
+
+// ------------------------------------------------------------
+// ICM-20948
+// ------------------------------------------------------------
+
+ICM20948 icm(
+    I2C_ICM
+);
+
+
+// ------------------------------------------------------------
+// Controlador de motores
+// ------------------------------------------------------------
 
 MotorControlador motores(
     Serial1,
@@ -92,9 +184,19 @@ MotorControlador motores(
     115200
 );
 
+
+// ------------------------------------------------------------
+// ToF
+// ------------------------------------------------------------
+
 TOF200F tof(
     tca
 );
+
+
+// ------------------------------------------------------------
+// ARGB
+// ------------------------------------------------------------
 
 ARGB leds;
 
@@ -106,11 +208,16 @@ ARGB leds;
 LinhaAnalise analiseLinha;
 
 AS7341Analise analiseCorEsquerda;
+
 AS7341Analise analiseCorDireita;
 
-IMU imu(icm);
+IMU imu(
+    icm
+);
 
-TOFAnalise analiseTOF(tof);
+TOFAnalise analiseTOF(
+    tof
+);
 
 
 // ============================================================
@@ -119,20 +226,24 @@ TOFAnalise analiseTOF(tof);
 
 PIDLinha pidLinha;
 
+
 ControleLinha controleLinha(
     pidLinha,
     motores
 );
+
 
 ControleGiro controleGiro(
     imu,
     motores
 );
 
+
 ControleObstaculo controleObstaculo(
     imu,
     motores
 );
+
 
 Verde verde(
     analiseCorEsquerda
@@ -158,7 +269,7 @@ MaquinaEstados maquinaEstados(
 
 
 // ============================================================
-// DADOS ATUAIS
+// DADOS DOS SENSORES
 // ============================================================
 
 ArrayData dadosArray;
@@ -169,31 +280,29 @@ AS7341Data dadosCorEsquerda;
 
 AS7341Data dadosCorDireita;
 
+
+// ------------------------------------------------------------
+// Resultados das análises espectrais
+// ------------------------------------------------------------
+
 AS7341Resultado resultadoCorEsquerda;
 
 AS7341Resultado resultadoCorDireita;
 
 
 // ============================================================
-// CONTROLE DO INTERRUPTOR
+// ESTADO GERAL DO ROBÔ
 // ============================================================
 
-bool roboDesligado = false;
+bool roboParadoPorInterruptor = false;
 
 
 // ============================================================
-// DESLIGA ROBÔ
+// FUNÇÃO DE PARADA DE EMERGÊNCIA
 // ============================================================
 
-void desligarRobo()
+void pararRobo()
 {
-    if (roboDesligado)
-    {
-        return;
-    }
-
-    roboDesligado = true;
-
     controleLinha.stop();
 
     controleGiro.cancelar();
@@ -202,6 +311,8 @@ void desligarRobo()
 
     motores.stop();
 
+    delay(100);
+
     motores.release();
 
     leds.apagar();
@@ -209,13 +320,52 @@ void desligarRobo()
 
 
 // ============================================================
-// ATUALIZA INDICAÇÃO DOS LEDs
+// FALHA DE INICIALIZAÇÃO
+// ============================================================
+//
+// Em caso de falha de um hardware essencial:
+//
+// - motores são parados
+// - motores são liberados
+// - LEDs ficam vermelhos
+// - execução permanece parada
+// ============================================================
+
+void falhaInicializacao(
+    const char* mensagem
+)
+{
+    Serial.print(
+        "ERRO: "
+    );
+
+    Serial.println(
+        mensagem
+    );
+
+    motores.stop();
+
+    delay(100);
+
+    motores.release();
+
+    leds.mostrarVermelho();
+
+    while (true)
+    {
+        delay(1000);
+    }
+}
+
+
+// ============================================================
+// ATUALIZAÇÃO DOS LEDs
 // ============================================================
 
 void atualizarLEDs()
 {
     // --------------------------------------------------------
-    // Prioridade 1:
+    // PRIORIDADE 1
     // VERMELHO
     // --------------------------------------------------------
 
@@ -231,7 +381,7 @@ void atualizarLEDs()
 
 
     // --------------------------------------------------------
-    // Prioridade 2:
+    // PRIORIDADE 2
     // CINZA
     // --------------------------------------------------------
 
@@ -247,11 +397,13 @@ void atualizarLEDs()
 
 
     // --------------------------------------------------------
-    // Prioridade 3:
+    // PRIORIDADE 3
     // OBSTÁCULO
     // --------------------------------------------------------
 
-    if (analiseTOF.temObstaculo())
+    if (
+        analiseTOF.temObstaculo()
+    )
     {
         leds.mostrarObstaculo();
 
@@ -260,7 +412,7 @@ void atualizarLEDs()
 
 
     // --------------------------------------------------------
-    // Prioridade 4:
+    // PRIORIDADE 4
     // VERDE
     // --------------------------------------------------------
 
@@ -279,11 +431,13 @@ void atualizarLEDs()
 
 
     // --------------------------------------------------------
-    // Prioridade 5:
+    // PRIORIDADE 5
     // LINHA
     //
-    // Cada LED representa um sensor do array.
+    // Cada LED representa um sensor.
+    //
     // Preto = azul.
+    // Branco = apagado.
     // --------------------------------------------------------
 
     leds.mostrarLinha(
@@ -298,10 +452,20 @@ void atualizarLEDs()
 
 void setup()
 {
-    // --------------------------------------------------------
-    // Interruptor geral
-    // LOW = desligado
-    // --------------------------------------------------------
+    // ========================================================
+    // SERIAL DE DEBUG
+    // ========================================================
+
+    Serial.begin(
+        115200
+    );
+
+    delay(100);
+
+
+    // ========================================================
+    // INTERRUPTOR
+    // ========================================================
 
     pinMode(
         PINO_INTERRUPTOR,
@@ -309,73 +473,141 @@ void setup()
     );
 
 
-    // --------------------------------------------------------
-    // Inicializa ARGB
-    // --------------------------------------------------------
+    // ========================================================
+    // ARGB
+    // ========================================================
 
     leds.begin();
 
 
-    // --------------------------------------------------------
-    // Inicializa I2C
+    // ========================================================
+    // INICIALIZA TCA
+    // ========================================================
     //
-    // TCA e ICM compartilham o mesmo barramento físico.
-    // ICM não passa pelo TCA.
-    // --------------------------------------------------------
+    // O TCA usa o Wire principal.
+    //
+    // Como nenhum pino foi informado, a classe usa os pinos
+    // padrão do ESP32:
+    //
+    // SDA = GPIO21
+    // SCL = GPIO22
+    // ========================================================
 
     tca.begin(
-        PINO_SDA,
-        PINO_SCL,
+        -1,
+        -1,
         400000
     );
 
 
-    // --------------------------------------------------------
-    // ICM
-    // --------------------------------------------------------
+    // ========================================================
+    // INICIALIZA ICM
+    // ========================================================
+    //
+    // O ICM usa o segundo barramento I2C:
+    //
+    // SDA = 19
+    // SCL = 23
+    // ========================================================
 
-    icm.begin(
-        PINO_SDA,
-        PINO_SCL,
-        400000
+    if (
+        !icm.begin(
+            ICM_SDA,
+            ICM_SCL,
+            400000
+        )
+    )
+    {
+        falhaInicializacao(
+            "ICM-20948"
+        );
+    }
+
+
+    // ========================================================
+    // INICIA CAMADA DE IMU
+    // ========================================================
+
+    if (
+        !imu.begin()
+    )
+    {
+        falhaInicializacao(
+            "IMU"
+        );
+    }
+
+
+    // ========================================================
+    // CALIBRA GIROSCÓPIO
+    // ========================================================
+    //
+    // O robô deve permanecer completamente parado.
+    // ========================================================
+
+    Serial.println(
+        "Calibrando giroscopio..."
     );
 
-    imu.begin();
+    if (
+        !imu.calibrar()
+    )
+    {
+        falhaInicializacao(
+            "Calibracao do giroscopio"
+        );
+    }
+
+    imu.zerarHeading();
 
 
-    // --------------------------------------------------------
-    // Motores
-    // --------------------------------------------------------
+    // ========================================================
+    // MOTORES
+    // ========================================================
 
     motores.begin();
 
 
-    // --------------------------------------------------------
-    // Array de linha
-    // --------------------------------------------------------
+    // ========================================================
+    // ARRAY DE LINHA
+    // ========================================================
 
     arrayLinha.begin();
 
 
-    // --------------------------------------------------------
+    // ========================================================
     // AS7341
-    // --------------------------------------------------------
+    // ========================================================
 
-    sensoresCor.begin();
-
-
-    // --------------------------------------------------------
-    // ToF
-    // --------------------------------------------------------
-
-    tof.begin(
-        CANAL_TOF
-    );
+    if (
+        !sensoresCor.begin()
+    )
+    {
+        falhaInicializacao(
+            "AS7341"
+        );
+    }
 
 
-    // --------------------------------------------------------
-    // Controles
-    // --------------------------------------------------------
+    // ========================================================
+    // TOF
+    // ========================================================
+
+    if (
+        !tof.begin(
+            CANAL_TOF
+        )
+    )
+    {
+        falhaInicializacao(
+            "VL53L0X / ToF"
+        );
+    }
+
+
+    // ========================================================
+    // CONTROLE DE LINHA
+    // ========================================================
 
     controleLinha.begin();
 
@@ -383,46 +615,64 @@ void setup()
         VELOCIDADE_LINHA
     );
 
+
+    // ========================================================
+    // CONTROLE DE GIRO
+    // ========================================================
+
     controleGiro.begin();
+
+
+    // ========================================================
+    // CONTROLE DE OBSTÁCULO
+    // ========================================================
 
     controleObstaculo.begin();
 
 
-    // --------------------------------------------------------
-    // Máquina de estados
-    // --------------------------------------------------------
+    // ========================================================
+    // MÁQUINA DE ESTADOS
+    // ========================================================
 
     maquinaEstados.begin();
 
 
-    // --------------------------------------------------------
-    // Calibração inicial do giroscópio
-    //
-    // Não imprime nada na serial.
-    // O robô deve estar parado neste momento.
-    // --------------------------------------------------------
+    // ========================================================
+    // VERIFICA INTERRUPTOR
+    // ========================================================
 
-    imu.calibrar();
+    if (
+        digitalRead(
+            PINO_INTERRUPTOR
+        ) == LOW
+    )
+    {
+        roboParadoPorInterruptor = true;
 
-    imu.zerarHeading();
+        pararRobo();
+
+        Serial.println(
+            "Robo parado pelo interruptor."
+        );
+
+        return;
+    }
 
 
-    // --------------------------------------------------------
-    // Estado inicial dos LEDs
-    // --------------------------------------------------------
+    // ========================================================
+    // LEDS INICIAIS
+    // ========================================================
 
     leds.apagar();
 
 
-    // --------------------------------------------------------
-    // Se o interruptor já estiver desligado,
-    // o robô permanece desligado.
-    // --------------------------------------------------------
+    // ========================================================
+    // FINALIZA SETUP
+    // ========================================================
 
-    if (digitalRead(PINO_INTERRUPTOR) == LOW)
-    {
-        desligarRobo();
-    }
+    Serial.println(
+        "Robo inicializado."
+    );
 }
 
 
@@ -432,73 +682,93 @@ void setup()
 
 void loop()
 {
-    // --------------------------------------------------------
-    // Interruptor geral
-    //
-    // LOW = robô parado.
-    // --------------------------------------------------------
+    // ========================================================
+    // INTERRUPTOR DE SEGURANÇA
+    // ========================================================
 
-    if (digitalRead(PINO_INTERRUPTOR) == LOW)
+    if (
+        digitalRead(
+            PINO_INTERRUPTOR
+        ) == LOW
+    )
     {
-        desligarRobo();
+        if (
+            !roboParadoPorInterruptor
+        )
+        {
+            roboParadoPorInterruptor = true;
+
+            pararRobo();
+
+            Serial.println(
+                "Robo parado pelo interruptor."
+            );
+        }
 
         return;
     }
 
 
-    // --------------------------------------------------------
-    // Interruptor voltou para HIGH.
+    // ========================================================
+    // SE FOI PARADO PELO INTERRUPTOR
+    // ========================================================
     //
-    // Neste momento permitimos novamente a execução.
-    // --------------------------------------------------------
+    // Não reativa automaticamente.
+    //
+    // O reinício será feito por reset/reinicialização,
+    // enquanto ainda não definimos outro mecanismo explícito.
+    // ========================================================
 
-    if (roboDesligado)
+    if (
+        roboParadoPorInterruptor
+    )
     {
-        roboDesligado = false;
-
-        controles:
-        controleLinha.reset();
-
-        maquinaEstados.begin();
+        return;
     }
 
 
-    // --------------------------------------------------------
-    // Atualiza array de linha
-    // --------------------------------------------------------
+    // ========================================================
+    // ATUALIZA ARRAY
+    // ========================================================
 
     arrayLinha.update();
 
-    dadosArray = arrayLinha.getData();
+    dadosArray =
+        arrayLinha.getData();
+
 
     analiseLinha.update(
         dadosArray
     );
 
-    dadosLinha = analiseLinha.getData();
+    dadosLinha =
+        analiseLinha.getData();
 
 
-    // --------------------------------------------------------
-    // Atualiza AS7341
-    // --------------------------------------------------------
+    // ========================================================
+    // ATUALIZA AS7341
+    // ========================================================
 
     sensoresCor.update();
 
+
     dadosCorDireita =
         sensoresCor.getDireita();
+
 
     dadosCorEsquerda =
         sensoresCor.getEsquerda();
 
 
-    // --------------------------------------------------------
-    // Analisa cores
-    // --------------------------------------------------------
+    // ========================================================
+    // ANALISA CORES
+    // ========================================================
 
     resultadoCorDireita =
         analiseCorDireita.analisar(
             dadosCorDireita
         );
+
 
     resultadoCorEsquerda =
         analiseCorEsquerda.analisar(
@@ -506,18 +776,23 @@ void loop()
         );
 
 
-    // --------------------------------------------------------
-    // Atualiza ToF
-    // --------------------------------------------------------
+    // ========================================================
+    // ATUALIZA TOF
+    // ========================================================
 
     tof.update();
 
     analiseTOF.update();
 
 
-    // --------------------------------------------------------
-    // Atualiza máquina de estados
-    // --------------------------------------------------------
+    // ========================================================
+    // MÁQUINA DE ESTADOS
+    // ========================================================
+    //
+    // A máquina decide o que fazer.
+    //
+    // O Main NÃO decide curva, verde, obstáculo etc.
+    // ========================================================
 
     maquinaEstados.update(
         dadosLinha,
@@ -526,9 +801,9 @@ void loop()
     );
 
 
-    // --------------------------------------------------------
-    // Atualiza indicação visual
-    // --------------------------------------------------------
+    // ========================================================
+    // ATUALIZA INDICAÇÃO VISUAL
+    // ========================================================
 
     atualizarLEDs();
 }
