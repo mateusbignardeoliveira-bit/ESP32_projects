@@ -37,17 +37,24 @@ public:
         OBSTACULO_GIRO_2,
         OBSTACULO_RETO_2,
         OBSTACULO_GIRO_3,
+        OBSTACULO_RETO_3,
+        OBSTACULO_GIRO_4,
         OBSTACULO_BUSCANDO_LINHA,
 
-        STOP_PERMANENTE
+        STOP_CINZA,
+
+        STOP_VERMELHO
     };
 
 
     enum AcaoGiro
     {
         NENHUM_GIRO,
+
         GIRO_ESQUERDA,
+
         GIRO_DIREITA,
+
         GIRO_180
     };
 
@@ -69,13 +76,6 @@ public:
     void begin();
 
 
-    // Reinicia somente a lógica de execução.
-    //
-    // NÃO recalibra a IMU.
-    // NÃO zera o heading.
-    // NÃO reinicializa hardware.
-    //
-    // Usado quando o interruptor volta para HIGH.
     void resetExecucao();
 
 
@@ -88,7 +88,29 @@ public:
 
     Estado getEstado() const;
 
+
     bool parado() const;
+
+    bool paradoPorVermelho() const;
+
+    bool paradoPorCinza() const;
+
+
+    // --------------------------------------------------------
+    // Vermelho
+    // --------------------------------------------------------
+
+    void pararPorVermelho();
+
+
+    // --------------------------------------------------------
+    // Configuração do lado do obstáculo
+    //
+    // -1 = esquerda
+    // +1 = direita
+    // --------------------------------------------------------
+
+    void setLadoObstaculo(int lado);
 
 
 private:
@@ -128,7 +150,7 @@ private:
 
 
     // --------------------------------------------------------
-    // Avaliação de marca
+    // Avaliação
     // --------------------------------------------------------
 
     unsigned long inicioAvaliacao;
@@ -139,7 +161,7 @@ private:
 
 
     // --------------------------------------------------------
-    // Busca de linha
+    // Busca
     // --------------------------------------------------------
 
     unsigned long inicioBusca;
@@ -155,9 +177,17 @@ private:
 
     bool ladoObstaculoDefinido;
 
+    unsigned long inicioTrechoObstaculo;
+
+    unsigned long tempoRetoObstaculo1;
+
+    unsigned long tempoRetoObstaculo2;
+
+    unsigned long tempoMaximoRetoObstaculo3;
+
 
     // --------------------------------------------------------
-    // Estados internos
+    // Funções internas
     // --------------------------------------------------------
 
     void entrarEstado(
@@ -223,7 +253,8 @@ private:
     );
 
 
-    void pararPermanentemente();
+    void pararPorCinza();
+
 
 };
 

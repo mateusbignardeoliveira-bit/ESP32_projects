@@ -1,6 +1,10 @@
 #include "MaquinaEstados.h"
 
 
+// ============================================================
+// CONSTRUTOR
+// ============================================================
+
 MaquinaEstados::MaquinaEstados(
     LinhaAnalise& linha,
     AS7341Analise& corEsq,
@@ -41,11 +45,36 @@ MaquinaEstados::MaquinaEstados(
 
     tempoMaximoBusca = 2000;
 
-    ladoObstaculo = 0;
 
-    ladoObstaculoDefinido = false;
+    // --------------------------------------------------------
+    // Lado do obstáculo
+    //
+    // Direita como configuração inicial.
+    // Pode ser alterado pelo setLadoObstaculo().
+    // --------------------------------------------------------
+
+    ladoObstaculo = 1;
+
+    ladoObstaculoDefinido = true;
+
+
+    // --------------------------------------------------------
+    // Tempos iniciais do contorno
+    // --------------------------------------------------------
+
+    tempoRetoObstaculo1 = 450;
+
+    tempoRetoObstaculo2 = 650;
+
+    tempoMaximoRetoObstaculo3 = 2000;
+
+    inicioTrechoObstaculo = 0;
 }
 
+
+// ============================================================
+// BEGIN
+// ============================================================
 
 void MaquinaEstados::begin()
 {
@@ -59,6 +88,8 @@ void MaquinaEstados::begin()
 
     inicioBusca = 0;
 
+    inicioTrechoObstaculo = 0;
+
     controleLinha.stop();
 
     controleGiro.cancelar();
@@ -69,19 +100,12 @@ void MaquinaEstados::begin()
 }
 
 
+// ============================================================
+// RESET EXECUÇÃO
+// ============================================================
+
 void MaquinaEstados::resetExecucao()
 {
-    // --------------------------------------------------------
-    // IMPORTANTE:
-    //
-    // Este método NÃO mexe na IMU.
-    //
-    // Não calibra.
-    // Não zera heading.
-    //
-    // Apenas limpa tudo que pertence à execução do robô.
-    // --------------------------------------------------------
-
     estado = INICIO;
 
     acaoGiro = NENHUM_GIRO;
@@ -92,38 +116,17 @@ void MaquinaEstados::resetExecucao()
 
     inicioBusca = 0;
 
+    inicioTrechoObstaculo = 0;
 
-    // --------------------------------------------------------
-    // Limpa PID / controle de linha
-    // --------------------------------------------------------
 
     controleLinha.stop();
 
-
-    // --------------------------------------------------------
-    // Cancela qualquer giro em andamento
-    // --------------------------------------------------------
-
     controleGiro.cancelar();
-
-
-    // --------------------------------------------------------
-    // Cancela qualquer movimento de obstáculo
-    // --------------------------------------------------------
 
     controleObstaculo.cancelar();
 
-
-    // --------------------------------------------------------
-    // Limpa toda a memória da avaliação de cores
-    // --------------------------------------------------------
-
     analiseVerde.reset();
 
-
-    // --------------------------------------------------------
-    // Garante motores parados.
-    // --------------------------------------------------------
 
     motores.stop();
 
@@ -132,6 +135,10 @@ void MaquinaEstados::resetExecucao()
     motores.release();
 }
 
+
+// ============================================================
+// UPDATE
+// ============================================================
 
 void MaquinaEstados::update(
     const LinhaData& linha,
@@ -193,6 +200,8 @@ void MaquinaEstados::update(
         case OBSTACULO_GIRO_2:
         case OBSTACULO_RETO_2:
         case OBSTACULO_GIRO_3:
+        case OBSTACULO_RETO_3:
+        case OBSTACULO_GIRO_4:
         case OBSTACULO_BUSCANDO_LINHA:
 
             processarObstaculo(linha);
@@ -200,7 +209,14 @@ void MaquinaEstados::update(
             break;
 
 
-        case STOP_PERMANENTE:
+        case STOP_CINZA:
+
+            motores.stop();
+
+            break;
+
+
+        case STOP_VERMELHO:
 
             motores.stop();
 
@@ -209,11 +225,18 @@ void MaquinaEstados::update(
 }
 
 
+// ============================================================
+// SEGUINDO LINHA
+// ============================================================
+
 void MaquinaEstados::processarSeguindoLinha(
     const LinhaData& linha
 )
 {
+    // --------------------------------------------------------
     // Obstáculo possui prioridade.
+    // --------------------------------------------------------
+
     if(analiseTOF.temObstaculo())
     {
         iniciarObstaculo();
@@ -222,9 +245,13 @@ void MaquinaEstados::processarSeguindoLinha(
     }
 
 
-    // Quatro ou mais sensores pretos:
-    // região especial / marca.
-    if(contarSensoresPretos(linha) >= 4)
+    // --------------------------------------------------------
+    // Região especial.
+    // --------------------------------------------------------
+
+    if(
+        contarSensoresPretos(linha) >= 4
+    )
     {
         iniciarAvaliacao(linha);
 
@@ -236,6 +263,10 @@ void MaquinaEstados::processarSeguindoLinha(
 }
 
 
+// ============================================================
+// INICIAR AVALIAÇÃO
+// ============================================================
+
 void MaquinaEstados::iniciarAvaliacao(
     const LinhaData& linha
 )
@@ -246,13 +277,11 @@ void MaquinaEstados::iniciarAvaliacao(
 
 
     // --------------------------------------------------------
-    // Guarda o lado da linha antes de entrar na região especial.
-    //
-    // posição negativa = esquerda
-    // posição positiva = direita
+    // Guarda tendência antes da região especial.
     // --------------------------------------------------------
 
-    tendenciaAntes = linha.posicao;
+    tendenciaAntes =
+        linha.posicao;
 
 
     int quantidadePretos =
@@ -264,12 +293,19 @@ void MaquinaEstados::iniciarAvaliacao(
     );
 
 
-    inicioAvaliacao = millis();
+    inicioAvaliacao =
+        millis();
 
 
-    entrarEstado(AVALIANDO_MARCA);
+    entrarEstado(
+        AVALIANDO_MARCA
+    );
 }
 
+
+// ============================================================
+// PROCESSAR AVALIAÇÃO
+// ============================================================
 
 void MaquinaEstados::processarAvaliacao(
     const LinhaData& linha,
@@ -277,7 +313,9 @@ void MaquinaEstados::processarAvaliacao(
     const AS7341Data& dadosCorDireita
 )
 {
+    // --------------------------------------------------------
     // Avanço lento durante avaliação.
+    // --------------------------------------------------------
 
     motores.setSpeed(
         100,
@@ -299,11 +337,13 @@ void MaquinaEstados::processarAvaliacao(
 
 
     unsigned long tempo =
-        millis() - inicioAvaliacao;
+        millis() -
+        inicioAvaliacao;
 
 
-    // Depois do tempo mínimo, quando deixou a região larga,
-    // podemos concluir a avaliação.
+    // --------------------------------------------------------
+    // Saiu da região larga.
+    // --------------------------------------------------------
 
     if(
         tempo >= tempoMinimoAvaliacao &&
@@ -316,14 +356,22 @@ void MaquinaEstados::processarAvaliacao(
     }
 
 
-    // Segurança contra ficar preso na avaliação.
+    // --------------------------------------------------------
+    // Proteção.
+    // --------------------------------------------------------
 
-    if(tempo >= tempoMaximoAvaliacao)
+    if(
+        tempo >= tempoMaximoAvaliacao
+    )
     {
         finalizarAvaliacao(linha);
     }
 }
 
+
+// ============================================================
+// FINALIZAR AVALIAÇÃO
+// ============================================================
 
 void MaquinaEstados::finalizarAvaliacao(
     const LinhaData& linha
@@ -334,28 +382,37 @@ void MaquinaEstados::finalizarAvaliacao(
     analiseVerde.finalizar();
 
 
-    // --------------------------------------------------------
-    // Vermelho ou cinza:
-    // parada permanente.
-    // --------------------------------------------------------
+    // ========================================================
+    // VERMELHO
+    // ========================================================
 
     if(
-        analiseVerde.detectouVermelho() ||
-        analiseVerde.detectouCinza()
+        analiseVerde.detectouVermelho()
     )
     {
-        pararPermanentemente();
+        pararPorVermelho();
 
         return;
     }
 
 
-    // --------------------------------------------------------
-    // Verde.
-    //
-    // Ambos os lados, mesmo que detectados em momentos
-    // diferentes, significam 180 graus.
-    // --------------------------------------------------------
+    // ========================================================
+    // CINZA
+    // ========================================================
+
+    if(
+        analiseVerde.detectouCinza()
+    )
+    {
+        pararPorCinza();
+
+        return;
+    }
+
+
+    // ========================================================
+    // VERDE
+    // ========================================================
 
     bool esquerda =
         analiseVerde.detectouVerdeEsquerda();
@@ -369,7 +426,9 @@ void MaquinaEstados::finalizarAvaliacao(
         direita
     )
     {
-        iniciarGiro(GIRO_180);
+        iniciarGiro(
+            GIRO_180
+        );
 
         return;
     }
@@ -377,7 +436,9 @@ void MaquinaEstados::finalizarAvaliacao(
 
     if(esquerda)
     {
-        iniciarGiro(GIRO_ESQUERDA);
+        iniciarGiro(
+            GIRO_ESQUERDA
+        );
 
         return;
     }
@@ -385,50 +446,65 @@ void MaquinaEstados::finalizarAvaliacao(
 
     if(direita)
     {
-        iniciarGiro(GIRO_DIREITA);
+        iniciarGiro(
+            GIRO_DIREITA
+        );
 
         return;
     }
 
 
-    // --------------------------------------------------------
-    // Nenhuma cor relevante.
-    //
-    // Todos brancos:
-    // curva para o lado que estava sendo seguido antes.
-    // --------------------------------------------------------
+    // ========================================================
+    // CURVA PRETA
+    // ========================================================
 
-    if(todosBrancos(linha))
+    if(
+        todosBrancos(linha)
+    )
     {
+        // Mantido conforme a versão que você confirmou
+        // funcionando no robô.
+
         if(tendenciaAntes < 0.0f)
         {
-            iniciarGiro(GIRO_DIREITA);
+            iniciarGiro(
+                GIRO_ESQUERDA
+            );
         }
         else if(tendenciaAntes > 0.0f)
         {
-            iniciarGiro(GIRO_ESQUERDA);
+            iniciarGiro(
+                GIRO_DIREITA
+            );
         }
         else
         {
             controleLinha.start();
 
-            entrarEstado(SEGUINDO_LINHA);
+            entrarEstado(
+                SEGUINDO_LINHA
+            );
         }
 
         return;
     }
 
 
-    // --------------------------------------------------------
-    // Ainda existe linha:
-    // falsa curva -> continua seguindo.
-    // --------------------------------------------------------
+    // ========================================================
+    // FALSA CURVA
+    // ========================================================
 
     controleLinha.start();
 
-    entrarEstado(SEGUINDO_LINHA);
+    entrarEstado(
+        SEGUINDO_LINHA
+    );
 }
 
+
+// ============================================================
+// INICIAR GIRO
+// ============================================================
 
 void MaquinaEstados::iniciarGiro(
     AcaoGiro acao
@@ -443,7 +519,6 @@ void MaquinaEstados::iniciarGiro(
 
     switch(acao)
     {
-
         case GIRO_ESQUERDA:
 
             controleGiro.curva90Esquerda();
@@ -469,15 +544,23 @@ void MaquinaEstados::iniciarGiro(
 
             controleLinha.start();
 
-            entrarEstado(SEGUINDO_LINHA);
+            entrarEstado(
+                SEGUINDO_LINHA
+            );
 
             return;
     }
 
 
-    entrarEstado(EXECUTANDO_GIRO);
+    entrarEstado(
+        EXECUTANDO_GIRO
+    );
 }
 
+
+// ============================================================
+// PROCESSAR GIRO
+// ============================================================
 
 void MaquinaEstados::processarGiro(
     const LinhaData& linha
@@ -485,72 +568,30 @@ void MaquinaEstados::processarGiro(
 {
     controleGiro.update();
 
-    if(!controleGiro.terminou())
+
+    if(
+        !controleGiro.terminou()
+    )
+    {
         return;
+    }
 
 
-    acaoGiro = NENHUM_GIRO;
+    acaoGiro =
+        NENHUM_GIRO;
+
 
     controleLinha.start();
 
-    entrarEstado(SEGUINDO_LINHA);
+    entrarEstado(
+        SEGUINDO_LINHA
+    );
 }
 
 
-void MaquinaEstados::iniciarBuscaLinha()
-{
-    inicioBusca = millis();
-
-    entrarEstado(BUSCANDO_LINHA);
-}
-
-
-bool MaquinaEstados::linhaEncontrada(
-    const LinhaData& linha
-)
-{
-    if(!linha.linhaDetectada)
-        return false;
-
-    if(linha.intensidade < 0.15f)
-        return false;
-
-
-    return true;
-}
-
-
-bool MaquinaEstados::todosBrancos(
-    const LinhaData& linha
-)
-{
-    for(int i = 0; i < 8; i++)
-    {
-        if(linha.sensores[i] > 0.08f)
-            return false;
-    }
-
-    return true;
-}
-
-
-int MaquinaEstados::contarSensoresPretos(
-    const LinhaData& linha
-)
-{
-    int quantidade = 0;
-
-    for(int i = 0; i < 8; i++)
-    {
-        if(linha.sensores[i] >= 0.35f)
-        {
-            quantidade++;
-        }
-    }
-
-    return quantidade;
-}
-
+// ============================================================
+// INICIAR OBSTÁCULO
+// ============================================================
 
 void MaquinaEstados::iniciarObstaculo()
 {
@@ -559,28 +600,37 @@ void MaquinaEstados::iniciarObstaculo()
     motores.stop();
 
 
-    // O lado ainda será definido.
-
     if(!ladoObstaculoDefinido)
     {
         return;
     }
 
 
-    if(ladoObstaculo < 0)
+    // --------------------------------------------------------
+    // Primeira lateralização
+    // --------------------------------------------------------
+
+    if(
+        ladoObstaculo < 0
+    )
     {
         controleGiro.curva90Esquerda();
-
-        entrarEstado(OBSTACULO_GIRO_1);
     }
     else
     {
         controleGiro.curva90Direita();
-
-        entrarEstado(OBSTACULO_GIRO_1);
     }
+
+
+    entrarEstado(
+        OBSTACULO_GIRO_1
+    );
 }
 
+
+// ============================================================
+// PROCESSAR OBSTÁCULO
+// ============================================================
 
 void MaquinaEstados::processarObstaculo(
     const LinhaData& linha
@@ -589,83 +639,282 @@ void MaquinaEstados::processarObstaculo(
     switch(estado)
     {
 
+        // ====================================================
+        // GIRO 1
+        // ====================================================
+
         case OBSTACULO_GIRO_1:
 
             controleGiro.update();
 
-            if(controleGiro.terminou())
+            if(
+                controleGiro.terminou()
+            )
             {
                 controleObstaculo.iniciarReto();
 
-                entrarEstado(OBSTACULO_RETO_1);
+                inicioTrechoObstaculo =
+                    millis();
+
+                entrarEstado(
+                    OBSTACULO_RETO_1
+                );
             }
 
             break;
 
+
+        // ====================================================
+        // RETO 1
+        //
+        // Afasta o robô lateralmente do obstáculo.
+        // ====================================================
 
         case OBSTACULO_RETO_1:
 
             controleObstaculo.update();
 
-            if(!analiseTOF.temObstaculo())
+            if(
+                millis() -
+                inicioTrechoObstaculo
+                >=
+                tempoRetoObstaculo1
+            )
             {
-                controleGiro.curva90Direita();
+                controleObstaculo.parar();
 
-                entrarEstado(OBSTACULO_GIRO_2);
+
+                // Lado oposto ao primeiro giro.
+
+                if(
+                    ladoObstaculo < 0
+                )
+                {
+                    controleGiro.curva90Direita();
+                }
+                else
+                {
+                    controleGiro.curva90Esquerda();
+                }
+
+
+                entrarEstado(
+                    OBSTACULO_GIRO_2
+                );
             }
 
             break;
 
+
+        // ====================================================
+        // GIRO 2
+        // ====================================================
 
         case OBSTACULO_GIRO_2:
 
             controleGiro.update();
 
-            if(controleGiro.terminou())
+            if(
+                controleGiro.terminou()
+            )
             {
                 controleObstaculo.iniciarReto();
 
-                entrarEstado(OBSTACULO_RETO_2);
+                inicioTrechoObstaculo =
+                    millis();
+
+                entrarEstado(
+                    OBSTACULO_RETO_2
+                );
             }
 
             break;
 
+
+        // ====================================================
+        // RETO 2
+        //
+        // Passa além do comprimento do obstáculo.
+        // ====================================================
 
         case OBSTACULO_RETO_2:
 
             controleObstaculo.update();
 
-            if(linhaEncontrada(linha))
+            if(
+                millis() -
+                inicioTrechoObstaculo
+                >=
+                tempoRetoObstaculo2
+            )
             {
                 controleObstaculo.parar();
 
-                controleGiro.curva90Esquerda();
 
-                entrarEstado(OBSTACULO_GIRO_3);
+                // Continua contornando para o mesmo lado
+                // da segunda mudança.
+
+                if(
+                    ladoObstaculo < 0
+                )
+                {
+                    controleGiro.curva90Direita();
+                }
+                else
+                {
+                    controleGiro.curva90Esquerda();
+                }
+
+
+                entrarEstado(
+                    OBSTACULO_GIRO_3
+                );
             }
 
             break;
 
+
+        // ====================================================
+        // GIRO 3
+        // ====================================================
 
         case OBSTACULO_GIRO_3:
 
             controleGiro.update();
 
-            if(controleGiro.terminou())
+            if(
+                controleGiro.terminou()
+            )
             {
-                entrarEstado(OBSTACULO_BUSCANDO_LINHA);
+                controleObstaculo.iniciarReto();
+
+                inicioTrechoObstaculo =
+                    millis();
+
+                entrarEstado(
+                    OBSTACULO_RETO_3
+                );
             }
 
             break;
 
 
+        // ====================================================
+        // RETO 3
+        //
+        // Volta lateralmente até reencontrar a linha.
+        // ====================================================
+
+        case OBSTACULO_RETO_3:
+
+            controleObstaculo.update();
+
+
+            if(
+                linhaEncontrada(linha)
+            )
+            {
+                controleObstaculo.parar();
+
+
+                // Último giro para alinhar com a linha.
+
+                if(
+                    ladoObstaculo < 0
+                )
+                {
+                    controleGiro.curva90Esquerda();
+                }
+                else
+                {
+                    controleGiro.curva90Direita();
+                }
+
+
+                entrarEstado(
+                    OBSTACULO_GIRO_4
+                );
+
+                break;
+            }
+
+
+            // ------------------------------------------------
+            // Segurança.
+            // ------------------------------------------------
+
+            if(
+                millis() -
+                inicioTrechoObstaculo
+                >=
+                tempoMaximoRetoObstaculo3
+            )
+            {
+                controleObstaculo.parar();
+
+
+                if(
+                    ladoObstaculo < 0
+                )
+                {
+                    controleGiro.curva90Esquerda();
+                }
+                else
+                {
+                    controleGiro.curva90Direita();
+                }
+
+
+                entrarEstado(
+                    OBSTACULO_GIRO_4
+                );
+            }
+
+            break;
+
+
+        // ====================================================
+        // GIRO 4
+        // ====================================================
+
+        case OBSTACULO_GIRO_4:
+
+            controleGiro.update();
+
+            if(
+                controleGiro.terminou()
+            )
+            {
+                controleObstaculo.iniciarReto();
+
+                entrarEstado(
+                    OBSTACULO_BUSCANDO_LINHA
+                );
+            }
+
+            break;
+
+
+        // ====================================================
+        // BUSCAR LINHA
+        // ====================================================
+
         case OBSTACULO_BUSCANDO_LINHA:
 
-            if(linhaEncontrada(linha))
+            controleObstaculo.update();
+
+
+            if(
+                linhaEncontrada(linha)
+            )
             {
+                controleObstaculo.parar();
+
                 controleLinha.start();
 
-                entrarEstado(SEGUINDO_LINHA);
+                entrarEstado(
+                    SEGUINDO_LINHA
+                );
             }
 
             break;
@@ -678,15 +927,109 @@ void MaquinaEstados::processarObstaculo(
 }
 
 
+// ============================================================
+// INICIAR BUSCA
+// ============================================================
+
+void MaquinaEstados::iniciarBuscaLinha()
+{
+    inicioBusca =
+        millis();
+
+    entrarEstado(
+        BUSCANDO_LINHA
+    );
+}
+
+
+// ============================================================
+// LINHA ENCONTRADA
+// ============================================================
+
+bool MaquinaEstados::linhaEncontrada(
+    const LinhaData& linha
+)
+{
+    if(!linha.linhaDetectada)
+        return false;
+
+    if(
+        linha.intensidade < 0.15f
+    )
+    {
+        return false;
+    }
+
+    return true;
+}
+
+
+// ============================================================
+// TODOS BRANCOS
+// ============================================================
+
+bool MaquinaEstados::todosBrancos(
+    const LinhaData& linha
+)
+{
+    for(int i = 0; i < 8; i++)
+    {
+        if(
+            linha.sensores[i] >
+            0.08f
+        )
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
+// ============================================================
+// CONTAR PRETOS
+// ============================================================
+
+int MaquinaEstados::contarSensoresPretos(
+    const LinhaData& linha
+)
+{
+    int quantidade = 0;
+
+    for(int i = 0; i < 8; i++)
+    {
+        if(
+            linha.sensores[i] >=
+            0.35f
+        )
+        {
+            quantidade++;
+        }
+    }
+
+    return quantidade;
+}
+
+
+// ============================================================
+// ENTRAR ESTADO
+// ============================================================
+
 void MaquinaEstados::entrarEstado(
     Estado novoEstado
 )
 {
-    estado = novoEstado;
+    estado =
+        novoEstado;
 }
 
 
-void MaquinaEstados::pararPermanentemente()
+// ============================================================
+// PARAR POR CINZA
+// ============================================================
+
+void MaquinaEstados::pararPorCinza()
 {
     controleLinha.stop();
 
@@ -696,9 +1039,65 @@ void MaquinaEstados::pararPermanentemente()
 
     motores.stop();
 
-    entrarEstado(STOP_PERMANENTE);
+    entrarEstado(
+        STOP_CINZA
+    );
 }
 
+
+// ============================================================
+// PARAR POR VERMELHO
+// ============================================================
+
+void MaquinaEstados::pararPorVermelho()
+{
+    controleLinha.stop();
+
+    controleGiro.cancelar();
+
+    controleObstaculo.parar();
+
+    motores.stop();
+
+    delay(100);
+
+    motores.release();
+
+    entrarEstado(
+        STOP_VERMELHO
+    );
+}
+
+
+// ============================================================
+// CONFIGURAR LADO DO OBSTÁCULO
+// ============================================================
+
+void MaquinaEstados::setLadoObstaculo(
+    int lado
+)
+{
+    if(lado == 0)
+    {
+        ladoObstaculoDefinido = false;
+
+        return;
+    }
+
+
+    if(lado < 0)
+        ladoObstaculo = -1;
+    else
+        ladoObstaculo = 1;
+
+
+    ladoObstaculoDefinido = true;
+}
+
+
+// ============================================================
+// GET ESTADO
+// ============================================================
 
 MaquinaEstados::Estado
 MaquinaEstados::getEstado() const
@@ -707,7 +1106,36 @@ MaquinaEstados::getEstado() const
 }
 
 
+// ============================================================
+// PARADO
+// ============================================================
+
 bool MaquinaEstados::parado() const
 {
-    return estado == STOP_PERMANENTE;
+    return (
+        estado == STOP_CINZA ||
+        estado == STOP_VERMELHO
+    );
+}
+
+
+// ============================================================
+// PARADO POR VERMELHO
+// ============================================================
+
+bool MaquinaEstados::paradoPorVermelho() const
+{
+    return estado ==
+           STOP_VERMELHO;
+}
+
+
+// ============================================================
+// PARADO POR CINZA
+// ============================================================
+
+bool MaquinaEstados::paradoPorCinza() const
+{
+    return estado ==
+           STOP_CINZA;
 }

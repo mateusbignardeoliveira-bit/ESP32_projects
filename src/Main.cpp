@@ -24,48 +24,13 @@
 
 
 // ============================================================
-// CONFIGURAÇÃO DE PINOS
+// PINOS
 // ============================================================
-
-// ------------------------------------------------------------
-// I2C do TCA9548A
-//
-// Usa o Wire principal do ESP32.
-// O TCA fica neste barramento.
-//
-// Pinos padrão do Wire:
-// SDA = GPIO21
-// SCL = GPIO22
-// ------------------------------------------------------------
-
-
-// ------------------------------------------------------------
-// I2C EXCLUSIVO DO ICM-20948
-//
-// O ICM NÃO passa pelo TCA.
-//
-// SDA = GPIO19
-// SCL = GPIO23
-// ------------------------------------------------------------
 
 static constexpr int ICM_SDA = 19;
 static constexpr int ICM_SCL = 23;
 
-
-// ------------------------------------------------------------
-// Botão / interruptor de segurança
-//
-// LOW = parar robô
-//
-// Quando acionado, o robô permanece parado até reiniciar.
-// ------------------------------------------------------------
-
 static constexpr int PINO_INTERRUPTOR = 32;
-
-
-// ------------------------------------------------------------
-// ARGB
-// ------------------------------------------------------------
 
 static constexpr int PINO_ARGB = 25;
 
@@ -74,69 +39,52 @@ static constexpr int PINO_ARGB = 25;
 // UART
 // ============================================================
 
-// ------------------------------------------------------------
-// Array de linha
-// ------------------------------------------------------------
-
 static constexpr int ARRAY_RX = 5;
 static constexpr int ARRAY_TX = 18;
-
-
-// ------------------------------------------------------------
-// Controlador Yahboom
-// ------------------------------------------------------------
-//
-// RX ESP32 = GPIO18
-// TX ESP32 = GPIO5
-// ------------------------------------------------------------
 
 static constexpr int MOTOR_RX = 16;
 static constexpr int MOTOR_TX = 17;
 
 
 // ============================================================
-// TCA9548A
+// TCA
 // ============================================================
-
-// ------------------------------------------------------------
-// Canal 0 = ToF
-// Canal 1 = AS7341 direita
-// Canal 2 = AS7341 esquerda
-// ------------------------------------------------------------
 
 static constexpr uint8_t CANAL_TOF = 0;
 
 
 // ============================================================
-// PARÂMETROS GERAIS
+// VELOCIDADE
 // ============================================================
 
 static constexpr int VELOCIDADE_LINHA = 200;
 
 
 // ============================================================
-// OBJETOS DE HARDWARE
+// LADO DO OBSTÁCULO
+// ============================================================
+//
+// -1 = esquerda
+// +1 = direita
+//
+// Direita é a configuração inicial.
+//
+// Depois podemos mudar sem mexer na máquina.
+//
+
+static constexpr int LADO_OBSTACULO = 1;
+
+
+// ============================================================
+// OBJETOS
 // ============================================================
 
-// ------------------------------------------------------------
-// TCA
-// ------------------------------------------------------------
-
 TCA tca;
-
-
-// ------------------------------------------------------------
-// Sensores AS7341
-// ------------------------------------------------------------
 
 AS7341Sensores sensoresCor(
     tca
 );
 
-
-// ------------------------------------------------------------
-// Array de linha
-// ------------------------------------------------------------
 
 ArrayLinha arrayLinha(
     Serial2,
@@ -146,36 +94,15 @@ ArrayLinha arrayLinha(
 );
 
 
-// ------------------------------------------------------------
-// Barramento I2C exclusivo do ICM
-// ------------------------------------------------------------
-//
-// IMPORTANTE:
-//
-// O TCA usa o Wire principal.
-//
-// O ICM usa outro controlador I2C,
-// permitindo trabalhar nos GPIO19/23
-// sem alterar o barramento do TCA.
-// ------------------------------------------------------------
-
 TwoWire I2C_ICM(
     1
 );
 
 
-// ------------------------------------------------------------
-// ICM-20948
-// ------------------------------------------------------------
-
 ICM20948 icm(
     I2C_ICM
 );
 
-
-// ------------------------------------------------------------
-// Controlador de motores
-// ------------------------------------------------------------
 
 MotorControlador motores(
     Serial1,
@@ -185,24 +112,16 @@ MotorControlador motores(
 );
 
 
-// ------------------------------------------------------------
-// ToF
-// ------------------------------------------------------------
-
 TOF200F tof(
     tca
 );
 
 
-// ------------------------------------------------------------
-// ARGB
-// ------------------------------------------------------------
-
 ARGB leds;
 
 
 // ============================================================
-// OBJETOS DE ANÁLISE
+// ANÁLISE
 // ============================================================
 
 LinhaAnalise analiseLinha;
@@ -221,7 +140,7 @@ TOFAnalise analiseTOF(
 
 
 // ============================================================
-// OBJETOS DE CONTROLE
+// CONTROLE
 // ============================================================
 
 PIDLinha pidLinha;
@@ -251,7 +170,7 @@ Verde verde(
 
 
 // ============================================================
-// MÁQUINA DE ESTADOS
+// MÁQUINA
 // ============================================================
 
 MaquinaEstados maquinaEstados(
@@ -269,7 +188,7 @@ MaquinaEstados maquinaEstados(
 
 
 // ============================================================
-// DADOS DOS SENSORES
+// DADOS
 // ============================================================
 
 ArrayData dadosArray;
@@ -281,24 +200,20 @@ AS7341Data dadosCorEsquerda;
 AS7341Data dadosCorDireita;
 
 
-// ------------------------------------------------------------
-// Resultados das análises espectrais
-// ------------------------------------------------------------
-
 AS7341Resultado resultadoCorEsquerda;
 
 AS7341Resultado resultadoCorDireita;
 
 
 // ============================================================
-// ESTADO GERAL DO ROBÔ
+// INTERRUPTOR
 // ============================================================
 
 bool roboParadoPorInterruptor = false;
 
 
 // ============================================================
-// FUNÇÃO DE PARADA DE EMERGÊNCIA
+// PARADA
 // ============================================================
 
 void pararRobo()
@@ -320,15 +235,7 @@ void pararRobo()
 
 
 // ============================================================
-// FALHA DE INICIALIZAÇÃO
-// ============================================================
-//
-// Em caso de falha de um hardware essencial:
-//
-// - motores são parados
-// - motores são liberados
-// - LEDs ficam vermelhos
-// - execução permanece parada
+// FALHA
 // ============================================================
 
 void falhaInicializacao(
@@ -343,6 +250,7 @@ void falhaInicializacao(
         mensagem
     );
 
+
     motores.stop();
 
     delay(100);
@@ -351,7 +259,8 @@ void falhaInicializacao(
 
     leds.mostrarVermelho();
 
-    while (true)
+
+    while(true)
     {
         delay(1000);
     }
@@ -359,17 +268,44 @@ void falhaInicializacao(
 
 
 // ============================================================
-// ATUALIZAÇÃO DOS LEDs
+// LEDS
 // ============================================================
 
 void atualizarLEDs()
 {
     // --------------------------------------------------------
-    // PRIORIDADE 1
+    // VERMELHO TRAVADO
+    // --------------------------------------------------------
+
+    if(
+        maquinaEstados.paradoPorVermelho()
+    )
+    {
+        leds.mostrarVermelho();
+
+        return;
+    }
+
+
+    // --------------------------------------------------------
+    // CINZA TRAVADO
+    // --------------------------------------------------------
+
+    if(
+        maquinaEstados.paradoPorCinza()
+    )
+    {
+        leds.mostrarCinza();
+
+        return;
+    }
+
+
+    // --------------------------------------------------------
     // VERMELHO
     // --------------------------------------------------------
 
-    if (
+    if(
         resultadoCorEsquerda.vermelhoDetectado ||
         resultadoCorDireita.vermelhoDetectado
     )
@@ -381,11 +317,10 @@ void atualizarLEDs()
 
 
     // --------------------------------------------------------
-    // PRIORIDADE 2
     // CINZA
     // --------------------------------------------------------
 
-    if (
+    if(
         resultadoCorEsquerda.cinzaDetectado ||
         resultadoCorDireita.cinzaDetectado
     )
@@ -397,11 +332,10 @@ void atualizarLEDs()
 
 
     // --------------------------------------------------------
-    // PRIORIDADE 3
     // OBSTÁCULO
     // --------------------------------------------------------
 
-    if (
+    if(
         analiseTOF.temObstaculo()
     )
     {
@@ -412,11 +346,10 @@ void atualizarLEDs()
 
 
     // --------------------------------------------------------
-    // PRIORIDADE 4
     // VERDE
     // --------------------------------------------------------
 
-    if (
+    if(
         resultadoCorEsquerda.verdeDetectado ||
         resultadoCorDireita.verdeDetectado
     )
@@ -431,13 +364,7 @@ void atualizarLEDs()
 
 
     // --------------------------------------------------------
-    // PRIORIDADE 5
     // LINHA
-    //
-    // Cada LED representa um sensor.
-    //
-    // Preto = azul.
-    // Branco = apagado.
     // --------------------------------------------------------
 
     leds.mostrarLinha(
@@ -452,10 +379,6 @@ void atualizarLEDs()
 
 void setup()
 {
-    // ========================================================
-    // SERIAL DE DEBUG
-    // ========================================================
-
     Serial.begin(
         115200
     );
@@ -481,16 +404,7 @@ void setup()
 
 
     // ========================================================
-    // INICIALIZA TCA
-    // ========================================================
-    //
-    // O TCA usa o Wire principal.
-    //
-    // Como nenhum pino foi informado, a classe usa os pinos
-    // padrão do ESP32:
-    //
-    // SDA = GPIO21
-    // SCL = GPIO22
+    // TCA
     // ========================================================
 
     tca.begin(
@@ -501,16 +415,10 @@ void setup()
 
 
     // ========================================================
-    // INICIALIZA ICM
-    // ========================================================
-    //
-    // O ICM usa o segundo barramento I2C:
-    //
-    // SDA = 19
-    // SCL = 23
+    // ICM
     // ========================================================
 
-    if (
+    if(
         !icm.begin(
             ICM_SDA,
             ICM_SCL,
@@ -525,10 +433,10 @@ void setup()
 
 
     // ========================================================
-    // INICIA CAMADA DE IMU
+    // IMU
     // ========================================================
 
-    if (
+    if(
         !imu.begin()
     )
     {
@@ -539,17 +447,15 @@ void setup()
 
 
     // ========================================================
-    // CALIBRA GIROSCÓPIO
-    // ========================================================
-    //
-    // O robô deve permanecer completamente parado.
+    // CALIBRAÇÃO
     // ========================================================
 
     Serial.println(
         "Calibrando giroscopio..."
     );
 
-    if (
+
+    if(
         !imu.calibrar()
     )
     {
@@ -557,6 +463,7 @@ void setup()
             "Calibracao do giroscopio"
         );
     }
+
 
     imu.zerarHeading();
 
@@ -569,7 +476,7 @@ void setup()
 
 
     // ========================================================
-    // ARRAY DE LINHA
+    // ARRAY
     // ========================================================
 
     arrayLinha.begin();
@@ -579,7 +486,7 @@ void setup()
     // AS7341
     // ========================================================
 
-    if (
+    if(
         !sensoresCor.begin()
     )
     {
@@ -593,7 +500,7 @@ void setup()
     // TOF
     // ========================================================
 
-    if (
+    if(
         !tof.begin(
             CANAL_TOF
         )
@@ -631,17 +538,26 @@ void setup()
 
 
     // ========================================================
-    // MÁQUINA DE ESTADOS
+    // LADO OBSTÁCULO
+    // ========================================================
+
+    maquinaEstados.setLadoObstaculo(
+        LADO_OBSTACULO
+    );
+
+
+    // ========================================================
+    // MÁQUINA
     // ========================================================
 
     maquinaEstados.begin();
 
 
     // ========================================================
-    // VERIFICA INTERRUPTOR
+    // INTERRUPTOR INICIAL
     // ========================================================
 
-    if (
+    if(
         digitalRead(
             PINO_INTERRUPTOR
         ) == LOW
@@ -659,16 +575,8 @@ void setup()
     }
 
 
-    // ========================================================
-    // LEDS INICIAIS
-    // ========================================================
-
     leds.apagar();
 
-
-    // ========================================================
-    // FINALIZA SETUP
-    // ========================================================
 
     Serial.println(
         "Robo inicializado."
@@ -682,20 +590,99 @@ void setup()
 
 void loop()
 {
-     // ========================================================
-    // INTERRUPTOR
+    // ========================================================
+    // AS7341 É LIDO PRIMEIRO
+    //
+    // Isso permite que o vermelho tenha prioridade absoluta
+    // sobre o botão.
     // ========================================================
 
-    if(digitalRead(PINO_INTERRUPTOR) == LOW)
+    sensoresCor.update();
+
+
+    dadosCorDireita =
+        sensoresCor.getDireita();
+
+    dadosCorEsquerda =
+        sensoresCor.getEsquerda();
+
+
+    resultadoCorDireita =
+        analiseCorDireita.analisar(
+            dadosCorDireita
+        );
+
+
+    resultadoCorEsquerda =
+        analiseCorEsquerda.analisar(
+            dadosCorEsquerda
+        );
+
+
+    // ========================================================
+    // VERMELHO TEM PRIORIDADE ABSOLUTA
+    // ========================================================
+
+    if(
+        resultadoCorEsquerda.vermelhoDetectado ||
+        resultadoCorDireita.vermelhoDetectado
+    )
     {
-        if(!roboParadoPorInterruptor)
+        maquinaEstados.pararPorVermelho();
+
+        atualizarLEDs();
+
+        return;
+    }
+
+
+    // --------------------------------------------------------
+    // Se já estava travado por vermelho, ignora tudo,
+    // inclusive botão.
+    // --------------------------------------------------------
+
+    if(
+        maquinaEstados.paradoPorVermelho()
+    )
+    {
+        motores.stop();
+
+        leds.mostrarVermelho();
+
+        return;
+    }
+
+
+    // ========================================================
+    // BOTÃO
+    //
+    // Neste ponto:
+    //
+    // - cinza pode ser interrompido
+    // - obstáculo pode ser interrompido
+    // - curva pode ser interrompida
+    // - segue linha pode ser interrompido
+    //
+    // Vermelho já foi tratado acima.
+    // ========================================================
+
+    if(
+        digitalRead(
+            PINO_INTERRUPTOR
+        ) == LOW
+    )
+    {
+        if(
+            !roboParadoPorInterruptor
+        )
         {
-            roboParadoPorInterruptor = true;
+            roboParadoPorInterruptor =
+                true;
 
             pararRobo();
 
             Serial.println(
-                "Robo parado pelo interruptor."
+                "Robo pausado pelo interruptor."
             );
         }
 
@@ -704,29 +691,33 @@ void loop()
 
 
     // ========================================================
-    // INTERRUPTOR VOLTOU PARA HIGH
+    // BOTÃO VOLTOU PARA HIGH
+    //
+    // Reinicia somente a execução.
+    //
+    // Não recalibra IMU.
+    // Não zera heading.
     // ========================================================
 
-    if(roboParadoPorInterruptor)
+    if(
+        roboParadoPorInterruptor
+    )
     {
         Serial.println(
             "Novo ciclo iniciado."
         );
 
-        // Limpa toda a lógica anterior.
-        //
-        // Não recalibra a IMU.
-        // Não zera heading.
         maquinaEstados.resetExecucao();
 
         leds.apagar();
 
-        roboParadoPorInterruptor = false;
+        roboParadoPorInterruptor =
+            false;
     }
 
 
     // ========================================================
-    // ATUALIZA ARRAY
+    // ARRAY
     // ========================================================
 
     arrayLinha.update();
@@ -744,38 +735,7 @@ void loop()
 
 
     // ========================================================
-    // ATUALIZA AS7341
-    // ========================================================
-
-    sensoresCor.update();
-
-
-    dadosCorDireita =
-        sensoresCor.getDireita();
-
-
-    dadosCorEsquerda =
-        sensoresCor.getEsquerda();
-
-
-    // ========================================================
-    // ANALISA CORES
-    // ========================================================
-
-    resultadoCorDireita =
-        analiseCorDireita.analisar(
-            dadosCorDireita
-        );
-
-
-    resultadoCorEsquerda =
-        analiseCorEsquerda.analisar(
-            dadosCorEsquerda
-        );
-
-
-    // ========================================================
-    // ATUALIZA TOF
+    // TOF
     // ========================================================
 
     tof.update();
@@ -784,12 +744,7 @@ void loop()
 
 
     // ========================================================
-    // MÁQUINA DE ESTADOS
-    // ========================================================
-    //
-    // A máquina decide o que fazer.
-    //
-    // O Main NÃO decide curva, verde, obstáculo etc.
+    // MÁQUINA
     // ========================================================
 
     maquinaEstados.update(
@@ -800,7 +755,7 @@ void loop()
 
 
     // ========================================================
-    // ATUALIZA INDICAÇÃO VISUAL
+    // LED
     // ========================================================
 
     atualizarLEDs();
