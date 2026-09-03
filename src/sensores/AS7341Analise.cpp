@@ -22,7 +22,7 @@
 
 static const float LIMIAR_MIN_VERDE_CLEAR = 12.0f;
 static const float LIMIAR_MIN_VERMELHO_CLEAR = 15.0f;
-static const float LIMIAR_MIN_CINZA_CLEAR = 30.0f;
+static const float LIMIAR_MIN_CINZA_CLEAR = 32.0f;
 
 
 // ============================================================
@@ -50,9 +50,9 @@ static const float LIMIAR_MIN_CINZA_CLEAR = 30.0f;
 // Portanto usamos três características simultaneamente.
 // ============================================================
 
-static const float LIMIAR_VERDE_R_G_MAX = 1.05f;
-static const float LIMIAR_VERDE_G_B_MIN = 1.40f;
-static const float LIMIAR_VERDE_F4_F6_MIN = 1.20f;
+static const float LIMIAR_VERDE_R_G_MAX = 1.15f;
+static const float LIMIAR_VERDE_G_B_MIN = 1.30f;
+static const float LIMIAR_VERDE_F4_F6_MIN = 1.10f;
 
 
 // ============================================================
@@ -70,9 +70,9 @@ static const float LIMIAR_VERDE_F4_F6_MIN = 1.20f;
 // Usamos margem considerável para evitar falso positivo.
 // ============================================================
 
-static const float LIMIAR_VERMELHO_R_G_MIN = 3.0f;
-static const float LIMIAR_VERMELHO_R_B_MIN = 3.0f;
-static const float LIMIAR_VERMELHO_R_CLEAR_MIN = 0.50f;
+static const float LIMIAR_VERMELHO_R_G_MIN = 4.0f;
+static const float LIMIAR_VERMELHO_R_B_MIN = 4.0f;
+static const float LIMIAR_VERMELHO_R_CLEAR_MIN = 0.58f;
 
 
 // ============================================================
@@ -106,11 +106,11 @@ static const float LIMIAR_VERMELHO_R_CLEAR_MIN = 0.50f;
 // não corresponde às leituras reais do material.
 // ============================================================
 
-static const float LIMIAR_CINZA_R_CLEAR_MIN = 0.35f;
-static const float LIMIAR_CINZA_R_CLEAR_MAX = 0.60f;
+static const float LIMIAR_CINZA_R_CLEAR_MIN = 0.38f;
+static const float LIMIAR_CINZA_R_CLEAR_MAX = 0.52f;
 
-static const float LIMIAR_CINZA_G_B_MIN = 0.85f;
-static const float LIMIAR_CINZA_G_B_MAX = 1.15f;
+static const float LIMIAR_CINZA_G_B_MIN = 0.90f;
+static const float LIMIAR_CINZA_G_B_MAX = 1.10f;
 
 
 // ============================================================

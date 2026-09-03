@@ -69,10 +69,26 @@ static constexpr int VELOCIDADE_LINHA = 200;
 //
 // Direita é a configuração inicial.
 //
-// Depois podemos mudar sem mexer na máquina.
-//
 
 static constexpr int LADO_OBSTACULO = 1;
+
+
+// ============================================================
+// CONFIRMAÇÃO TEMPORAL DE CORES
+// ============================================================
+//
+// Uma única leitura não é suficiente para parar o robô.
+//
+// A cor precisa aparecer durante várias leituras
+// consecutivas.
+//
+// Isso evita que um ruído momentâneo do AS7341
+// seja interpretado como uma marca real.
+//
+
+static constexpr int LEITURAS_VERMELHO_NECESSARIAS = 15;
+
+static constexpr int LEITURAS_CINZA_NECESSARIAS = 10;
 
 
 // ============================================================
@@ -80,6 +96,7 @@ static constexpr int LADO_OBSTACULO = 1;
 // ============================================================
 
 TCA tca;
+
 
 AS7341Sensores sensoresCor(
     tca
@@ -130,9 +147,11 @@ AS7341Analise analiseCorEsquerda;
 
 AS7341Analise analiseCorDireita;
 
+
 IMU imu(
     icm
 );
+
 
 TOFAnalise analiseTOF(
     tof
@@ -213,6 +232,15 @@ bool roboParadoPorInterruptor = false;
 
 
 // ============================================================
+// CONTADORES DE CONFIRMAÇÃO
+// ============================================================
+
+int contadorVermelho = 0;
+
+int contadorCinza = 0;
+
+
+// ============================================================
 // PARADA
 // ============================================================
 
@@ -231,6 +259,95 @@ void pararRobo()
     motores.release();
 
     leds.apagar();
+}
+
+
+// ============================================================
+// RESET DA CONFIRMAÇÃO DE CORES
+// ============================================================
+
+void resetConfirmacaoCores()
+{
+    contadorVermelho = 0;
+
+    contadorCinza = 0;
+}
+
+
+// ============================================================
+// ATUALIZAR CONFIRMAÇÃO DE CORES
+// ============================================================
+//
+// A lógica é:
+//
+// leitura vermelha
+//     -> contador vermelho++
+//
+// leitura não vermelha
+//     -> contador vermelho = 0
+//
+// leitura cinza
+//     -> contador cinza++
+//
+// leitura não cinza
+//     -> contador cinza = 0
+//
+// Assim, somente uma sequência realmente contínua
+// consegue confirmar a marca.
+//
+
+void atualizarConfirmacaoCores()
+{
+    // ========================================================
+    // VERMELHO
+    // ========================================================
+
+    if(
+        resultadoCorEsquerda.vermelhoDetectado ||
+        resultadoCorDireita.vermelhoDetectado
+    )
+    {
+        contadorVermelho++;
+
+        if(
+            contadorVermelho >
+            LEITURAS_VERMELHO_NECESSARIAS
+        )
+        {
+            contadorVermelho =
+                LEITURAS_VERMELHO_NECESSARIAS;
+        }
+    }
+    else
+    {
+        contadorVermelho = 0;
+    }
+
+
+    // ========================================================
+    // CINZA
+    // ========================================================
+
+    if(
+        resultadoCorEsquerda.cinzaDetectado ||
+        resultadoCorDireita.cinzaDetectado
+    )
+    {
+        contadorCinza++;
+
+        if(
+            contadorCinza >
+            LEITURAS_CINZA_NECESSARIAS
+        )
+        {
+            contadorCinza =
+                LEITURAS_CINZA_NECESSARIAS;
+        }
+    }
+    else
+    {
+        contadorCinza = 0;
+    }
 }
 
 
@@ -565,6 +682,8 @@ void setup()
     {
         roboParadoPorInterruptor = true;
 
+        resetConfirmacaoCores();
+
         pararRobo();
 
         Serial.println(
@@ -573,6 +692,13 @@ void setup()
 
         return;
     }
+
+
+    // ========================================================
+    // ESTADO INICIAL DOS CONTADORES
+    // ========================================================
+
+    resetConfirmacaoCores();
 
 
     leds.apagar();
@@ -591,17 +717,19 @@ void setup()
 void loop()
 {
     // ========================================================
-    // AS7341 É LIDO PRIMEIRO
-    //
-    // Isso permite que o vermelho tenha prioridade absoluta
-    // sobre o botão.
+    // LEITURA DOS AS7341
     // ========================================================
+    //
+    // Fazemos a leitura antes do interruptor porque
+    // vermelho possui prioridade absoluta.
+    //
 
     sensoresCor.update();
 
 
     dadosCorDireita =
         sensoresCor.getDireita();
+
 
     dadosCorEsquerda =
         sensoresCor.getEsquerda();
@@ -620,12 +748,27 @@ void loop()
 
 
     // ========================================================
-    // VERMELHO TEM PRIORIDADE ABSOLUTA
+    // ATUALIZA CONFIRMAÇÃO
     // ========================================================
 
+    atualizarConfirmacaoCores();
+
+
+    // ========================================================
+    // VERMELHO CONFIRMADO
+    // ========================================================
+    //
+    // Depois de 5 leituras consecutivas:
+    //
+    // -> STOP_VERMELHO
+    //
+    // Esse estado é absoluto.
+    // O interruptor não consegue liberá-lo.
+    //
+
     if(
-        resultadoCorEsquerda.vermelhoDetectado ||
-        resultadoCorDireita.vermelhoDetectado
+        contadorVermelho >=
+        LEITURAS_VERMELHO_NECESSARIAS
     )
     {
         maquinaEstados.pararPorVermelho();
@@ -636,10 +779,12 @@ void loop()
     }
 
 
-    // --------------------------------------------------------
-    // Se já estava travado por vermelho, ignora tudo,
-    // inclusive botão.
-    // --------------------------------------------------------
+    // ========================================================
+    // VERMELHO JÁ TRAVADO
+    // ========================================================
+    //
+    // Continua travado para sempre.
+    //
 
     if(
         maquinaEstados.paradoPorVermelho()
@@ -654,12 +799,13 @@ void loop()
 
 
     // ========================================================
-    // BOTÃO
-    //
-    // O botão vem antes do cinza.
-    //
-    // Assim, um STOP_CINZA pode ser resetado pelo botão.
+    // INTERRUPTOR LOW
     // ========================================================
+    //
+    // LOW = robô pausado.
+    //
+    // O contador de cores é limpo.
+    //
 
     if(
         digitalRead(
@@ -674,6 +820,8 @@ void loop()
             roboParadoPorInterruptor =
                 true;
 
+            resetConfirmacaoCores();
+
             pararRobo();
 
             Serial.println(
@@ -686,15 +834,21 @@ void loop()
 
 
     // ========================================================
-    // BOTÃO VOLTOU PARA HIGH
-    //
-    // Reinicia somente a execução.
-    //
-    // Não recalibra IMU.
-    // Não zera heading.
-    //
-    // Isso também limpa um eventual STOP_CINZA.
+    // INTERRUPTOR VOLTOU PARA HIGH
     // ========================================================
+    //
+    // Isso significa:
+    //
+    // NOVO CICLO DE EXECUÇÃO
+    //
+    // Não recalibra a IMU.
+    //
+    // Não chama imu.calibrar().
+    //
+    // Não chama imu.zerarHeading().
+    //
+    // Apenas reinicia a máquina de estados.
+    //
 
     if(
         roboParadoPorInterruptor
@@ -704,9 +858,15 @@ void loop()
             "Novo ciclo iniciado."
         );
 
+
         maquinaEstados.resetExecucao();
 
+
+        resetConfirmacaoCores();
+
+
         leds.apagar();
+
 
         roboParadoPorInterruptor =
             false;
@@ -714,17 +874,20 @@ void loop()
 
 
     // ========================================================
-    // CINZA
-    //
-    // Cinza PARA o robô, mas NÃO é uma trava absoluta.
-    //
-    // O botão continua tendo prioridade para permitir
-    // resetExecucao() e início de um novo ciclo.
+    // CINZA CONFIRMADO
     // ========================================================
+    //
+    // Cinza precisa aparecer em 5 leituras consecutivas.
+    //
+    // Diferentemente do vermelho, cinza NÃO é uma trava
+    // absoluta.
+    //
+    // O interruptor acima consegue reiniciar a execução.
+    //
 
     if(
-        resultadoCorEsquerda.cinzaDetectado ||
-        resultadoCorDireita.cinzaDetectado
+        contadorCinza >=
+        LEITURAS_CINZA_NECESSARIAS
     )
     {
         maquinaEstados.pararPorCinza();
@@ -741,6 +904,7 @@ void loop()
 
     arrayLinha.update();
 
+
     dadosArray =
         arrayLinha.getData();
 
@@ -748,6 +912,7 @@ void loop()
     analiseLinha.update(
         dadosArray
     );
+
 
     dadosLinha =
         analiseLinha.getData();

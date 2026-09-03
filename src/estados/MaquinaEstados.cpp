@@ -2,6 +2,32 @@
 
 
 // ============================================================
+// CONFIGURAÇÃO DA RÉ ANTES DE CURVAS DE 90°
+// ============================================================
+//
+// Ajuste principalmente RE_CURVA_MS.
+//
+// Quanto maior o valor, mais tempo o robô ficará de ré.
+//
+// A ré é utilizada SOMENTE antes de:
+//   - curva de 90° para verde à esquerda
+//   - curva de 90° para verde à direita
+//   - curva preta de 90°
+//
+// NÃO é utilizada antes de:
+//   - curvas de 180°
+//   - curvas do obstáculo
+//
+// ============================================================
+
+static constexpr int VELOCIDADE_RE_CURVA = -100;
+
+static constexpr int RE_CURVA_MS = 125;
+
+static constexpr int PAUSA_APOS_RE_MS = 30;
+
+
+// ============================================================
 // CONSTRUTOR
 // ============================================================
 
@@ -69,6 +95,27 @@ MaquinaEstados::MaquinaEstados(
     tempoMaximoRetoObstaculo3 = 2000;
 
     inicioTrechoObstaculo = 0;
+}
+
+
+// ============================================================
+// RÉ ANTES DA CURVA DE 90°
+// ============================================================
+
+void MaquinaEstados::reAntesDaCurva()
+{
+    motores.setSpeed(
+        VELOCIDADE_RE_CURVA,
+        VELOCIDADE_RE_CURVA,
+        VELOCIDADE_RE_CURVA,
+        VELOCIDADE_RE_CURVA
+    );
+
+    delay(RE_CURVA_MS);
+
+    motores.stop();
+
+    delay(PAUSA_APOS_RE_MS);
 }
 
 
@@ -421,6 +468,12 @@ void MaquinaEstados::finalizarAvaliacao(
         analiseVerde.detectouVerdeDireita();
 
 
+    // --------------------------------------------------------
+    // Verde dos dois lados = 180°.
+    //
+    // NÃO dá ré.
+    // --------------------------------------------------------
+
     if(
         esquerda &&
         direita
@@ -434,8 +487,16 @@ void MaquinaEstados::finalizarAvaliacao(
     }
 
 
+    // --------------------------------------------------------
+    // Verde somente à esquerda = 90°.
+    //
+    // DÁ RÉ antes da curva.
+    // --------------------------------------------------------
+
     if(esquerda)
     {
+        reAntesDaCurva();
+
         iniciarGiro(
             GIRO_ESQUERDA
         );
@@ -444,8 +505,16 @@ void MaquinaEstados::finalizarAvaliacao(
     }
 
 
+    // --------------------------------------------------------
+    // Verde somente à direita = 90°.
+    //
+    // DÁ RÉ antes da curva.
+    // --------------------------------------------------------
+
     if(direita)
     {
+        reAntesDaCurva();
+
         iniciarGiro(
             GIRO_DIREITA
         );
@@ -462,19 +531,26 @@ void MaquinaEstados::finalizarAvaliacao(
         todosBrancos(linha)
     )
     {
-        // Mantido conforme a versão que você confirmou
-        // funcionando no robô.
+        // Mantido exatamente conforme a versão
+        // que você confirmou funcionando.
+        //
+        // A ré acontece somente porque esta situação
+        // representa uma curva preta de 90°.
 
         if(tendenciaAntes < 0.0f)
         {
+            reAntesDaCurva();
+
             iniciarGiro(
-                GIRO_ESQUERDA
+                GIRO_DIREITA
             );
         }
         else if(tendenciaAntes > 0.0f)
         {
+            reAntesDaCurva();
+
             iniciarGiro(
-                GIRO_DIREITA
+                GIRO_ESQUERDA
             );
         }
         else
@@ -608,6 +684,8 @@ void MaquinaEstados::iniciarObstaculo()
 
     // --------------------------------------------------------
     // Primeira lateralização
+    //
+    // NÃO dá ré.
     // --------------------------------------------------------
 
     if(
@@ -685,6 +763,8 @@ void MaquinaEstados::processarObstaculo(
 
 
                 // Lado oposto ao primeiro giro.
+                //
+                // NÃO dá ré.
 
                 if(
                     ladoObstaculo < 0
@@ -753,6 +833,8 @@ void MaquinaEstados::processarObstaculo(
 
                 // Continua contornando para o mesmo lado
                 // da segunda mudança.
+                //
+                // NÃO dá ré.
 
                 if(
                     ladoObstaculo < 0
@@ -818,6 +900,8 @@ void MaquinaEstados::processarObstaculo(
 
 
                 // Último giro para alinhar com a linha.
+                //
+                // NÃO dá ré.
 
                 if(
                     ladoObstaculo < 0

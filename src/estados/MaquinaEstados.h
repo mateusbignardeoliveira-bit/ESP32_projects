@@ -254,6 +254,8 @@ private:
         const LinhaData& linha
     );
 
+    void reAntesDaCurva();
+
 
 };
 
