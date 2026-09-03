@@ -42,9 +42,9 @@ static constexpr int RE_OBSTACULO_MS = 300;
 
 static constexpr int PAUSA_APOS_RE_OBSTACULO_MS = 30;
 
-static constexpr unsigned long OBSTACULO_RETO_INICIAL_MS = 1000;
+static constexpr unsigned long OBSTACULO_RETO_INICIAL_MS = 1300;
 
-static constexpr unsigned long OBSTACULO_RETO_ORBITA_MS = 2000;
+static constexpr unsigned long OBSTACULO_RETO_ORBITA_MS = 2500;
 
 
 // ------------------------------------------------------------
