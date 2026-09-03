@@ -13,6 +13,8 @@ tca(multiplexador)
 
     totalSoma = 0;
 
+    quantidadeLeituras = 0;
+
     distanciaAtual = 0;
 
     ultimaLeitura = 0;
@@ -63,6 +65,8 @@ bool TOF200F::begin(
 
     totalSoma = 0;
 
+    quantidadeLeituras = 0;
+
     distanciaAtual = 0;
 
     ultimaLeitura = 0;
@@ -94,7 +98,7 @@ bool TOF200F::begin(
 void TOF200F::update()
 {
     // --------------------------------------------------------
-    // Por padrão não existe uma leitura nova nesta chamada.
+    // Por padrão não existe nova leitura nesta chamada.
     // --------------------------------------------------------
 
     novaLeitura = false;
@@ -113,7 +117,7 @@ void TOF200F::update()
 
 
     // --------------------------------------------------------
-    // Ainda não existe uma nova medição
+    // Ainda não terminou uma nova medição
     // --------------------------------------------------------
 
     if(!lox.isRangeComplete())
@@ -123,23 +127,40 @@ void TOF200F::update()
 
 
     // --------------------------------------------------------
-    // Lê uma medição REAL do VL53L0X
+    // Lê a medição
     // --------------------------------------------------------
 
     uint16_t leituraBruta =
         lox.readRange();
 
 
+    // A partir daqui existe uma nova medição,
+    // mesmo que ela seja inválida.
+
     novaLeitura = true;
 
 
     // --------------------------------------------------------
-    // Verifica erro
+    // Verifica o status REAL da medição
     // --------------------------------------------------------
 
-    if(
-        lox.readRangeStatus() == 4
-    )
+    uint8_t status =
+        lox.readRangeStatus();
+
+
+    // --------------------------------------------------------
+    // SOMENTE STATUS 0 É ACEITO
+    //
+    // Status 0 = Range Valid
+    //
+    // Status 2 = Signal Fail
+    // Status 4 = Phase Fail
+    //
+    // Leituras com qualquer outro status não entram
+    // no filtro e não podem confirmar obstáculo.
+    // --------------------------------------------------------
+
+    if(status != 0)
     {
         ultimaLeitura = 0;
 
@@ -153,7 +174,7 @@ void TOF200F::update()
 
 
     // --------------------------------------------------------
-    // Aplica offset
+    // Aplica correção de calibração
     // --------------------------------------------------------
 
     int leituraCalibrada =
@@ -170,7 +191,7 @@ void TOF200F::update()
 
 
     // --------------------------------------------------------
-    // Guarda leitura individual
+    // Guarda a última leitura individual
     // --------------------------------------------------------
 
     ultimaLeitura =
@@ -178,36 +199,67 @@ void TOF200F::update()
 
 
     // --------------------------------------------------------
-    // Filtro de 3 leituras para getDistance()
+    // Filtro de média móvel
+    //
+    // IMPORTANTE:
+    // somente leituras válidas entram no filtro.
     // --------------------------------------------------------
 
-    totalSoma -=
-        leituras[indiceLeitura];
-
-
-    leituras[indiceLeitura] =
-        leituraCalibrada;
-
-
-    totalSoma +=
-        leituraCalibrada;
-
-
-    indiceLeitura++;
-
-
     if(
-        indiceLeitura >=
-        NUM_LEITURAS
+        quantidadeLeituras < NUM_LEITURAS
     )
     {
-        indiceLeitura = 0;
+        leituras[indiceLeitura] =
+            leituraCalibrada;
+
+        totalSoma +=
+            leituraCalibrada;
+
+        quantidadeLeituras++;
+
+        indiceLeitura++;
+
+        if(
+            indiceLeitura >= NUM_LEITURAS
+        )
+        {
+            indiceLeitura = 0;
+        }
+    }
+    else
+    {
+        totalSoma -=
+            leituras[indiceLeitura];
+
+        leituras[indiceLeitura] =
+            leituraCalibrada;
+
+        totalSoma +=
+            leituraCalibrada;
+
+        indiceLeitura++;
+
+        if(
+            indiceLeitura >= NUM_LEITURAS
+        )
+        {
+            indiceLeitura = 0;
+        }
     }
 
 
-    distanciaAtual =
-        totalSoma /
-        NUM_LEITURAS;
+    // --------------------------------------------------------
+    // Atualiza distância filtrada
+    // --------------------------------------------------------
+
+    if(
+        quantidadeLeituras > 0
+    )
+    {
+        distanciaAtual =
+            totalSoma /
+            quantidadeLeituras;
+    }
 }
 
 

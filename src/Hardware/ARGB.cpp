@@ -86,13 +86,13 @@ void ARGB::mostrarLinha(const float sensores[8])
 // VERDE
 //
 // Esquerda:
-// LED 1 e LED 2
-//
-// Direita:
 // LED 7 e LED 8
 //
+// Direita:
+// LED 1 e LED 2
+//
 // Se ambos:
-// LED 1, 2, 7 e 8
+// LED 1 e 2, 7 e 8
 // ============================================================
 
 void ARGB::mostrarVerde(
@@ -104,14 +104,14 @@ void ARGB::mostrarVerde(
 
     if (esquerda)
     {
-        leds[0] = CRGB::Green;
-        leds[1] = CRGB::Green;
+        leds[6] = CRGB::Green;
+        leds[7] = CRGB::Green;
     }
 
     if (direita)
     {
-        leds[6] = CRGB::Green;
-        leds[7] = CRGB::Green;
+        leds[0] = CRGB::Green;
+        leds[1] = CRGB::Green;
     }
 
     mostrar();

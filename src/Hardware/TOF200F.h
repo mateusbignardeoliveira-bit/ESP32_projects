@@ -20,7 +20,7 @@ private:
 
 
     // --------------------------------------------------------
-    // Filtro da distância geral
+    // Filtro da distância
     // --------------------------------------------------------
 
     static const int NUM_LEITURAS = 3;
@@ -30,6 +30,8 @@ private:
     int indiceLeitura;
 
     int totalSoma;
+
+    int quantidadeLeituras;
 
     int distanciaAtual;
 

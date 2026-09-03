@@ -491,7 +491,9 @@ void MaquinaEstados::processarGiro(
 
     acaoGiro = NENHUM_GIRO;
 
-    iniciarBuscaLinha();
+    controleLinha.start();
+
+    entrarEstado(SEGUINDO_LINHA);
 }
 
 

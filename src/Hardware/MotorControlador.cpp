@@ -206,6 +206,11 @@ void MotorControlador::setSpeed(
     m3 = limitarVelocidade(m3);
     m4 = limitarVelocidade(m4);
 
+    // INVERTE O SENTIDO FÍSICO DOS MOTORES
+    m1 = -m1;
+    m2 = -m2;
+    m3 = -m3;
+    m4 = -m4;
 
     // --------------------------------------------------------
     // Guarda último comando
