@@ -19,6 +19,10 @@ private:
     uint8_t canal;
 
 
+    // --------------------------------------------------------
+    // Filtro da distância geral
+    // --------------------------------------------------------
+
     static const int NUM_LEITURAS = 3;
 
     int leituras[NUM_LEITURAS];
@@ -28,6 +32,22 @@ private:
     int totalSoma;
 
     int distanciaAtual;
+
+
+    // --------------------------------------------------------
+    // Última leitura individual
+    // --------------------------------------------------------
+
+    int ultimaLeitura;
+
+    bool novaLeitura;
+
+    bool ultimaLeituraValida;
+
+
+    // --------------------------------------------------------
+    // Correção de calibração
+    // --------------------------------------------------------
 
     static constexpr int OFFSET_CORRECAO_MM = -20;
 
@@ -48,7 +68,20 @@ public:
     void update();
 
 
+    // Distância filtrada
     int getDistance();
+
+
+    // Última leitura individual calibrada
+    int getUltimaLeitura();
+
+
+    // Indica se uma nova medição foi recebida
+    bool temNovaLeitura();
+
+
+    // Indica se a última medição foi válida
+    bool ultimaLeituraValidaAgora();
 
 };
 

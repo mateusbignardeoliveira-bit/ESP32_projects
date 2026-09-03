@@ -5,17 +5,21 @@
 // CONSTRUTOR
 // ============================================================
 
-TOFAnalise::TOFAnalise(TOF200F& sensor)
+TOFAnalise::TOFAnalise(
+    TOF200F& sensor
+)
 :
 tof(sensor)
 {
-
     distancia = 0;
 
     valido = false;
 
     obstaculo = false;
 
+    leiturasBaixas = 0;
+
+    leiturasAltas = 0;
 }
 
 
@@ -25,23 +29,41 @@ tof(sensor)
 
 void TOFAnalise::update()
 {
+    // --------------------------------------------------------
+    // Mantém a distância filtrada disponível para consulta.
+    // --------------------------------------------------------
 
-    distancia = tof.getDistance();
+    distancia =
+        tof.getDistance();
 
 
     // --------------------------------------------------------
-    // Verifica se a leitura é válida
+    // Só processa quando o VL53L0X realmente terminou uma
+    // nova medição.
     // --------------------------------------------------------
 
-    if(distancia <= 0)
+    if(!tof.temNovaLeitura())
     {
+        return;
+    }
 
+
+    // --------------------------------------------------------
+    // Leitura inválida
+    // --------------------------------------------------------
+
+    if(!tof.ultimaLeituraValidaAgora())
+    {
         valido = false;
 
-        obstaculo = false;
+        // Leitura inválida não pode confirmar obstáculo.
+        leiturasBaixas = 0;
+
+        // Também não usamos como evidência de que o
+        // obstáculo desapareceu.
+        leiturasAltas = 0;
 
         return;
-
     }
 
 
@@ -49,22 +71,100 @@ void TOFAnalise::update()
 
 
     // --------------------------------------------------------
-    // Verifica obstáculo
+    // Usa a leitura INDIVIDUAL real.
     // --------------------------------------------------------
 
-    if(distancia <= DISTANCIA_OBSTACULO_MM)
+    int leitura =
+        tof.getUltimaLeitura();
+
+
+    // ========================================================
+    // OBSTÁCULO AINDA NÃO CONFIRMADO
+    // ========================================================
+
+    if(!obstaculo)
     {
 
-        obstaculo = true;
+        leiturasAltas = 0;
 
+
+        // ----------------------------------------------------
+        // Só consideramos "perto" abaixo de 80 mm.
+        // ----------------------------------------------------
+
+        if(
+            leitura <=
+            DISTANCIA_CONFIRMACAO_MM
+        )
+        {
+            leiturasBaixas++;
+
+
+            if(
+                leiturasBaixas >=
+                LEITURAS_PARA_CONFIRMAR
+            )
+            {
+                obstaculo = true;
+
+                // Começamos uma nova contagem de liberação.
+                leiturasAltas = 0;
+            }
+        }
+        else
+        {
+            // ------------------------------------------------
+            // Qualquer leitura acima de 80 mm quebra a
+            // sequência de confirmação.
+            // ------------------------------------------------
+
+            leiturasBaixas = 0;
+        }
+
+        return;
+    }
+
+
+    // ========================================================
+    // OBSTÁCULO JÁ CONFIRMADO
+    // ========================================================
+
+    leiturasBaixas = 0;
+
+
+    // --------------------------------------------------------
+    // Só liberamos o obstáculo quando houver distância
+    // claramente maior que 120 mm.
+    // --------------------------------------------------------
+
+    if(
+        leitura >
+        DISTANCIA_LIBERACAO_MM
+    )
+    {
+        leiturasAltas++;
+
+
+        if(
+            leiturasAltas >=
+            LEITURAS_PARA_LIBERAR
+        )
+        {
+            obstaculo = false;
+
+            leiturasAltas = 0;
+        }
     }
     else
     {
+        // ----------------------------------------------------
+        // Zona abaixo de 120 mm mantém o obstáculo.
+        //
+        // Isso inclui a zona neutra de 80..120 mm.
+        // ----------------------------------------------------
 
-        obstaculo = false;
-
+        leiturasAltas = 0;
     }
-
 }
 
 
@@ -74,21 +174,17 @@ void TOFAnalise::update()
 
 int TOFAnalise::getDistancia()
 {
-
     return distancia;
-
 }
 
 
 // ============================================================
-// LEITURA VÁLIDA
+// VALIDADE
 // ============================================================
 
 bool TOFAnalise::isValido() const
 {
-
     return valido;
-
 }
 
 
@@ -98,9 +194,7 @@ bool TOFAnalise::isValido() const
 
 bool TOFAnalise::temObstaculo() const
 {
-
     return obstaculo;
-
 }
 
 
@@ -110,7 +204,15 @@ bool TOFAnalise::temObstaculo() const
 
 int TOFAnalise::getLimiteObstaculo()
 {
+    return DISTANCIA_CONFIRMACAO_MM;
+}
 
-    return DISTANCIA_OBSTACULO_MM;
 
+// ============================================================
+// CONTADOR
+// ============================================================
+
+int TOFAnalise::getLeiturasBaixas() const
+{
+    return leiturasBaixas;
 }

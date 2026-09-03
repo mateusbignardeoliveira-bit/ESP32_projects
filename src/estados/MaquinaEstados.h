@@ -15,204 +15,215 @@
 
 #include "../Hardware/MotorControlador.h"
 
+
 class MaquinaEstados
 {
 public:
 
-enum Estado
-{
-    INICIO,
+    enum Estado
+    {
+        INICIO,
 
-    SEGUINDO_LINHA,
+        SEGUINDO_LINHA,
 
-    AVALIANDO_MARCA,
+        AVALIANDO_MARCA,
 
-    EXECUTANDO_GIRO,
+        EXECUTANDO_GIRO,
 
-    BUSCANDO_LINHA,
+        BUSCANDO_LINHA,
 
-    OBSTACULO_GIRO_1,
-    OBSTACULO_RETO_1,
-    OBSTACULO_GIRO_2,
-    OBSTACULO_RETO_2,
-    OBSTACULO_GIRO_3,
-    OBSTACULO_BUSCANDO_LINHA,
+        OBSTACULO_GIRO_1,
+        OBSTACULO_RETO_1,
+        OBSTACULO_GIRO_2,
+        OBSTACULO_RETO_2,
+        OBSTACULO_GIRO_3,
+        OBSTACULO_BUSCANDO_LINHA,
 
-    STOP_PERMANENTE
-};
-
-
-enum AcaoGiro
-{
-    NENHUM_GIRO,
-    GIRO_ESQUERDA,
-    GIRO_DIREITA,
-    GIRO_180
-};
+        STOP_PERMANENTE
+    };
 
 
-MaquinaEstados(
-    LinhaAnalise& linha,
-    AS7341Analise& corEsquerda,
-    AS7341Analise& corDireita,
-    Verde& verde,
-    TOFAnalise& tof,
-    IMU& imu,
-    ControleLinha& controleLinha,
-    ControleGiro& controleGiro,
-    ControleObstaculo& controleObstaculo,
-    MotorControlador& motores
-);
+    enum AcaoGiro
+    {
+        NENHUM_GIRO,
+        GIRO_ESQUERDA,
+        GIRO_DIREITA,
+        GIRO_180
+    };
 
 
-void begin();
+    MaquinaEstados(
+        LinhaAnalise& linha,
+        AS7341Analise& corEsquerda,
+        AS7341Analise& corDireita,
+        Verde& verde,
+        TOFAnalise& tof,
+        IMU& imu,
+        ControleLinha& controleLinha,
+        ControleGiro& controleGiro,
+        ControleObstaculo& controleObstaculo,
+        MotorControlador& motores
+    );
 
 
-// Atualiza a máquina com as leituras atuais.
-void update(
-    const LinhaData& dadosLinha,
-    const AS7341Data& dadosCorEsquerda,
-    const AS7341Data& dadosCorDireita
-);
+    void begin();
 
 
-Estado getEstado() const;
+    // Reinicia somente a lógica de execução.
+    //
+    // NÃO recalibra a IMU.
+    // NÃO zera o heading.
+    // NÃO reinicializa hardware.
+    //
+    // Usado quando o interruptor volta para HIGH.
+    void resetExecucao();
 
-bool parado() const;
+
+    void update(
+        const LinhaData& dadosLinha,
+        const AS7341Data& dadosCorEsquerda,
+        const AS7341Data& dadosCorDireita
+    );
+
+
+    Estado getEstado() const;
+
+    bool parado() const;
+
 
 private:
 
-LinhaAnalise& analiseLinha;
+    LinhaAnalise& analiseLinha;
 
-AS7341Analise& sensorCorEsquerda;
+    AS7341Analise& sensorCorEsquerda;
 
-AS7341Analise& sensorCorDireita;
+    AS7341Analise& sensorCorDireita;
 
-Verde& analiseVerde;
+    Verde& analiseVerde;
 
-TOFAnalise& analiseTOF;
+    TOFAnalise& analiseTOF;
 
-IMU& sensorIMU;
-
-
-ControleLinha& controleLinha;
-
-ControleGiro& controleGiro;
-
-ControleObstaculo& controleObstaculo;
-
-MotorControlador& motores;
+    IMU& sensorIMU;
 
 
-Estado estado;
+    ControleLinha& controleLinha;
 
-AcaoGiro acaoGiro;
+    ControleGiro& controleGiro;
 
+    ControleObstaculo& controleObstaculo;
 
-// --------------------------------------------------------
-// Tendência antes da avaliação
-// --------------------------------------------------------
-
-float tendenciaAntes;
+    MotorControlador& motores;
 
 
-// --------------------------------------------------------
-// Avaliação de marca
-// --------------------------------------------------------
+    Estado estado;
 
-unsigned long inicioAvaliacao;
-
-unsigned long tempoMinimoAvaliacao;
-
-unsigned long tempoMaximoAvaliacao;
+    AcaoGiro acaoGiro;
 
 
-// --------------------------------------------------------
-// Busca de linha
-// --------------------------------------------------------
+    // --------------------------------------------------------
+    // Tendência antes da avaliação
+    // --------------------------------------------------------
 
-unsigned long inicioBusca;
-
-unsigned long tempoMaximoBusca;
+    float tendenciaAntes;
 
 
-// --------------------------------------------------------
-// Obstáculo
-// --------------------------------------------------------
+    // --------------------------------------------------------
+    // Avaliação de marca
+    // --------------------------------------------------------
 
-int ladoObstaculo;
+    unsigned long inicioAvaliacao;
 
-bool ladoObstaculoDefinido;
+    unsigned long tempoMinimoAvaliacao;
 
-
-// --------------------------------------------------------
-// Estados internos
-// --------------------------------------------------------
-
-void entrarEstado(
-    Estado novoEstado
-);
+    unsigned long tempoMaximoAvaliacao;
 
 
-void processarSeguindoLinha(
-    const LinhaData& linha
-);
+    // --------------------------------------------------------
+    // Busca de linha
+    // --------------------------------------------------------
+
+    unsigned long inicioBusca;
+
+    unsigned long tempoMaximoBusca;
 
 
-void iniciarAvaliacao(
-    const LinhaData& linha
-);
+    // --------------------------------------------------------
+    // Obstáculo
+    // --------------------------------------------------------
+
+    int ladoObstaculo;
+
+    bool ladoObstaculoDefinido;
 
 
-void processarAvaliacao(
-    const LinhaData& linha,
-    const AS7341Data& dadosCorEsquerda,
-    const AS7341Data& dadosCorDireita
-);
+    // --------------------------------------------------------
+    // Estados internos
+    // --------------------------------------------------------
+
+    void entrarEstado(
+        Estado novoEstado
+    );
 
 
-void finalizarAvaliacao(
-    const LinhaData& linha
-);
+    void processarSeguindoLinha(
+        const LinhaData& linha
+    );
 
 
-void iniciarGiro(
-    AcaoGiro acao
-);
+    void iniciarAvaliacao(
+        const LinhaData& linha
+    );
 
 
-void processarGiro(
-    const LinhaData& linha
-);
+    void processarAvaliacao(
+        const LinhaData& linha,
+        const AS7341Data& dadosCorEsquerda,
+        const AS7341Data& dadosCorDireita
+    );
 
 
-void iniciarObstaculo();
+    void finalizarAvaliacao(
+        const LinhaData& linha
+    );
 
 
-void processarObstaculo(
-    const LinhaData& linha
-);
+    void iniciarGiro(
+        AcaoGiro acao
+    );
 
 
-void iniciarBuscaLinha();
+    void processarGiro(
+        const LinhaData& linha
+    );
 
 
-bool linhaEncontrada(
-    const LinhaData& linha
-);
+    void iniciarObstaculo();
 
 
-bool todosBrancos(
-    const LinhaData& linha
-);
+    void processarObstaculo(
+        const LinhaData& linha
+    );
 
 
-int contarSensoresPretos(
-    const LinhaData& linha
-);
+    void iniciarBuscaLinha();
 
 
-void pararPermanentemente();
+    bool linhaEncontrada(
+        const LinhaData& linha
+    );
+
+
+    bool todosBrancos(
+        const LinhaData& linha
+    );
+
+
+    int contarSensoresPretos(
+        const LinhaData& linha
+    );
+
+
+    void pararPermanentemente();
 
 };
 

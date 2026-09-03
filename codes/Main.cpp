@@ -78,8 +78,8 @@ static constexpr int PINO_ARGB = 25;
 // Array de linha
 // ------------------------------------------------------------
 
-static constexpr int ARRAY_RX = 16;
-static constexpr int ARRAY_TX = 17;
+static constexpr int ARRAY_RX = 5;
+static constexpr int ARRAY_TX = 18;
 
 
 // ------------------------------------------------------------
@@ -90,8 +90,8 @@ static constexpr int ARRAY_TX = 17;
 // TX ESP32 = GPIO5
 // ------------------------------------------------------------
 
-static constexpr int MOTOR_RX = 18;
-static constexpr int MOTOR_TX = 5;
+static constexpr int MOTOR_RX = 16;
+static constexpr int MOTOR_TX = 17;
 
 
 // ============================================================
@@ -682,19 +682,13 @@ void setup()
 
 void loop()
 {
-    // ========================================================
-    // INTERRUPTOR DE SEGURANÇA
+     // ========================================================
+    // INTERRUPTOR
     // ========================================================
 
-    if (
-        digitalRead(
-            PINO_INTERRUPTOR
-        ) == LOW
-    )
+    if(digitalRead(PINO_INTERRUPTOR) == LOW)
     {
-        if (
-            !roboParadoPorInterruptor
-        )
+        if(!roboParadoPorInterruptor)
         {
             roboParadoPorInterruptor = true;
 
@@ -710,20 +704,24 @@ void loop()
 
 
     // ========================================================
-    // SE FOI PARADO PELO INTERRUPTOR
-    // ========================================================
-    //
-    // Não reativa automaticamente.
-    //
-    // O reinício será feito por reset/reinicialização,
-    // enquanto ainda não definimos outro mecanismo explícito.
+    // INTERRUPTOR VOLTOU PARA HIGH
     // ========================================================
 
-    if (
-        roboParadoPorInterruptor
-    )
+    if(roboParadoPorInterruptor)
     {
-        return;
+        Serial.println(
+            "Novo ciclo iniciado."
+        );
+
+        // Limpa toda a lógica anterior.
+        //
+        // Não recalibra a IMU.
+        // Não zera heading.
+        maquinaEstados.resetExecucao();
+
+        leds.apagar();
+
+        roboParadoPorInterruptor = false;
     }
 
 

@@ -1,163 +1,108 @@
 #include <Arduino.h>
 #include <Wire.h>
+#include <Adafruit_VL53L0X.h>
 
-#include "hardware/TCA.h"
-#include "hardware/TOF200F.h"
-#include "sensores/TOFAnalise.h"
+#include "Hardware/TCA.h"
 
-
-// ============================================================
-// CONFIGURAÇÃO
-// ============================================================
-
-// TCA9548A
 #define TCA_ENDERECO 0x70
-
-// TOF está no canal 0
 #define TOF_CANAL 0
 
+#define I2C_SDA 21
+#define I2C_SCL 22
 
-// ============================================================
-// OBJETOS
-// ============================================================
-
+Adafruit_VL53L0X tof;
 TCA tca(TCA_ENDERECO);
 
-TOF200F tof(tca);
-
-TOFAnalise tofAnalise(tof);
-
-
-// ============================================================
-// SETUP
-// ============================================================
+unsigned long ultimoPrint = 0;
 
 void setup()
 {
-
     Serial.begin(115200);
-
     delay(1000);
 
-
     Serial.println();
-    Serial.println("===============================");
-    Serial.println("       TESTE TOF200F");
-    Serial.println("===============================");
+    Serial.println("========================================");
+    Serial.println(" TESTE VL53L0X - DISTANCIA + STATUS");
+    Serial.println("========================================");
+    Serial.println();
 
-
-    // --------------------------------------------------------
-    // Inicializa TCA
-    // --------------------------------------------------------
-
-    tca.begin();
-
-
-    // --------------------------------------------------------
-    // Inicializa TOF
-    // --------------------------------------------------------
-
-    Serial.println("Inicializando TOF...");
-
-
-    if(!tof.begin(TOF_CANAL))
-    {
-
-        Serial.println("ERRO: TOF nao encontrado!");
-
-        while(true)
-        {
-            delay(1000);
-        }
-
-    }
-
-
-    Serial.println("TOF inicializado!");
-
-
-    // --------------------------------------------------------
-    // Mostra configuração
-    // --------------------------------------------------------
-
-    Serial.print("Limite de obstaculo: ");
-
-    Serial.print(
-        tofAnalise.getLimiteObstaculo()
+    tca.begin(
+        I2C_SDA,
+        I2C_SCL,
+        400000
     );
 
-    Serial.println(" mm");
+    if(!tca.selecionarCanal(TOF_CANAL))
+    {
+        Serial.println("ERRO AO SELECIONAR TCA");
+        return;
+    }
 
+    Serial.println("TCA canal 0 selecionado.");
 
+    if(!tof.begin(0x29))
+    {
+        Serial.println("ERRO: VL53L0X NAO ENCONTRADO");
+        return;
+    }
+
+    Serial.println("VL53L0X OK.");
+
+    tof.setMeasurementTimingBudgetMicroSeconds(33000);
+
+    tof.startRangeContinuous(40);
+
+    Serial.println("Medicao continua iniciada.");
     Serial.println();
-    Serial.println("Iniciando leituras...");
-    Serial.println();
-
 }
 
 
-// ============================================================
-// LOOP
-// ============================================================
-
 void loop()
 {
-
-    // --------------------------------------------------------
-    // Atualiza análise
-    // --------------------------------------------------------
-
-    tof.update();
-
-    tofAnalise.update();
-
-
-    // --------------------------------------------------------
-    // Mostra distância
-    // --------------------------------------------------------
-
-    Serial.print("DISTANCIA: ");
-
-    if(tofAnalise.isValido())
+    if(!tof.isRangeComplete())
     {
-
-        Serial.print(
-            tofAnalise.getDistancia()
-        );
-
-        Serial.print(" mm");
-
-
-    }
-    else
-    {
-
-        Serial.print("INVALIDA");
-
+        return;
     }
 
+    uint16_t distancia = tof.readRange();
 
-    // --------------------------------------------------------
-    // Mostra estado do obstáculo
-    // --------------------------------------------------------
+    uint8_t status = tof.readRangeStatus();
 
-    Serial.print("    |    OBSTACULO: ");
-
-
-    if(tofAnalise.temObstaculo())
+    if(millis() - ultimoPrint >= 100)
     {
+        ultimoPrint = millis();
 
-        Serial.println("SIM");
+        Serial.print("DIST: ");
+        Serial.print(distancia);
 
+        Serial.print(" mm | STATUS: ");
+        Serial.print(status);
+
+        Serial.print(" | ");
+
+        if(status == 0)
+        {
+            Serial.println("VALIDA");
+        }
+        else if(status == 1)
+        {
+            Serial.println("STATUS 1");
+        }
+        else if(status == 2)
+        {
+            Serial.println("STATUS 2");
+        }
+        else if(status == 3)
+        {
+            Serial.println("STATUS 3");
+        }
+        else if(status == 4)
+        {
+            Serial.println("OUT OF RANGE");
+        }
+        else
+        {
+            Serial.println("OUTRO STATUS");
+        }
     }
-    else
-    {
-
-        Serial.println("NAO");
-
-    }
-
-
-    delay(100);
-
 }
