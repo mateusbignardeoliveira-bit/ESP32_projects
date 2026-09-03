@@ -402,11 +402,11 @@ void MaquinaEstados::finalizarAvaliacao(
     {
         if(tendenciaAntes < 0.0f)
         {
-            iniciarGiro(GIRO_ESQUERDA);
+            iniciarGiro(GIRO_DIREITA);
         }
         else if(tendenciaAntes > 0.0f)
         {
-            iniciarGiro(GIRO_DIREITA);
+            iniciarGiro(GIRO_ESQUERDA);
         }
         else
         {
