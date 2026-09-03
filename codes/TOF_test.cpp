@@ -1,8 +1,12 @@
 #include <Arduino.h>
-#include <Wire.h>
-#include <Adafruit_VL53L0X.h>
 
 #include "Hardware/TCA.h"
+#include "Hardware/TOF200F.h"
+#include "sensores/TOFAnalise.h"
+
+// ============================================================
+// CONFIGURAÇÃO
+// ============================================================
 
 #define TCA_ENDERECO 0x70
 #define TOF_CANAL 0
@@ -10,21 +14,42 @@
 #define I2C_SDA 21
 #define I2C_SCL 22
 
-Adafruit_VL53L0X tof;
+// ============================================================
+// OBJETOS
+// ============================================================
+
 TCA tca(TCA_ENDERECO);
 
+TOF200F tof200f(tca);
+
+TOFAnalise tofAnalise(tof200f);
+
+// ============================================================
+// CONTROLE DE PRINT
+// ============================================================
+
 unsigned long ultimoPrint = 0;
+
+
+// ============================================================
+// SETUP
+// ============================================================
 
 void setup()
 {
     Serial.begin(115200);
+
     delay(1000);
 
     Serial.println();
-    Serial.println("========================================");
-    Serial.println(" TESTE VL53L0X - DISTANCIA + STATUS");
-    Serial.println("========================================");
+    Serial.println("==============================================");
+    Serial.println("           TESTE TOF200F + TOFANALISE");
+    Serial.println("==============================================");
     Serial.println();
+
+    // --------------------------------------------------------
+    // Inicializa I2C / TCA
+    // --------------------------------------------------------
 
     tca.begin(
         I2C_SDA,
@@ -32,77 +57,106 @@ void setup()
         400000
     );
 
-    if(!tca.selecionarCanal(TOF_CANAL))
+    Serial.println("TCA inicializado.");
+
+    // --------------------------------------------------------
+    // Inicializa TOF no canal 0
+    // --------------------------------------------------------
+
+    if(!tof200f.begin(TOF_CANAL))
     {
-        Serial.println("ERRO AO SELECIONAR TCA");
-        return;
+        Serial.println("ERRO: TOF200F NAO INICIALIZADO!");
+
+        while(true)
+        {
+            delay(1000);
+        }
     }
 
-    Serial.println("TCA canal 0 selecionado.");
-
-    if(!tof.begin(0x29))
-    {
-        Serial.println("ERRO: VL53L0X NAO ENCONTRADO");
-        return;
-    }
-
-    Serial.println("VL53L0X OK.");
-
-    tof.setMeasurementTimingBudgetMicroSeconds(33000);
-
-    tof.startRangeContinuous(40);
-
-    Serial.println("Medicao continua iniciada.");
+    Serial.println("TOF200F OK.");
     Serial.println();
+
+    Serial.println("INSTRUCOES:");
+    Serial.println();
+    Serial.println("1. Deixe a frente LIVRE.");
+    Serial.println("2. Coloque um obstaculo proximo.");
+    Serial.println("3. Retire o obstaculo.");
+    Serial.println();
+    Serial.println("Observe principalmente:");
+    Serial.println(" - LEITURA");
+    Serial.println(" - DISTANCIA FILTRADA");
+    Serial.println(" - VALIDO");
+    Serial.println(" - BAIXAS");
+    Serial.println(" - OBSTACULO");
+    Serial.println();
+
+    Serial.println("----------------------------------------------");
 }
 
 
+// ============================================================
+// LOOP
+// ============================================================
+
 void loop()
 {
-    if(!tof.isRangeComplete())
+    // --------------------------------------------------------
+    // Atualiza o hardware do TOF
+    // --------------------------------------------------------
+
+    tof200f.update();
+
+    // --------------------------------------------------------
+    // Atualiza a análise
+    // --------------------------------------------------------
+
+    tofAnalise.update();
+
+    // --------------------------------------------------------
+    // Mostra somente quando existe nova medição
+    // --------------------------------------------------------
+
+    if(
+        tof200f.temNovaLeitura()
+    )
     {
-        return;
-    }
+        Serial.print("LEITURA: ");
 
-    uint16_t distancia = tof.readRange();
-
-    uint8_t status = tof.readRangeStatus();
-
-    if(millis() - ultimoPrint >= 100)
-    {
-        ultimoPrint = millis();
-
-        Serial.print("DIST: ");
-        Serial.print(distancia);
-
-        Serial.print(" mm | STATUS: ");
-        Serial.print(status);
-
-        Serial.print(" | ");
-
-        if(status == 0)
+        if(tof200f.ultimaLeituraValidaAgora())
         {
-            Serial.println("VALIDA");
-        }
-        else if(status == 1)
-        {
-            Serial.println("STATUS 1");
-        }
-        else if(status == 2)
-        {
-            Serial.println("STATUS 2");
-        }
-        else if(status == 3)
-        {
-            Serial.println("STATUS 3");
-        }
-        else if(status == 4)
-        {
-            Serial.println("OUT OF RANGE");
+            Serial.print(tof200f.getUltimaLeitura());
+            Serial.print(" mm");
         }
         else
         {
-            Serial.println("OUTRO STATUS");
+            Serial.print("INVALIDA");
+        }
+
+        Serial.print(" | DIST FILTRADA: ");
+        Serial.print(tofAnalise.getDistancia());
+        Serial.print(" mm");
+
+        Serial.print(" | VALIDO: ");
+        Serial.print(
+            tofAnalise.isValido()
+            ? "SIM"
+            : "NAO"
+        );
+
+        Serial.print(" | BAIXAS: ");
+        Serial.print(
+            tofAnalise.getLeiturasBaixas()
+        );
+
+        Serial.print(" | OBSTACULO: ");
+
+        if(tofAnalise.temObstaculo())
+        {
+            Serial.println("SIM");
+        }
+        else
+        {
+            Serial.println("NAO");
         }
     }
 }

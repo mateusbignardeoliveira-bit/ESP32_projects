@@ -50,6 +50,14 @@ static constexpr unsigned long OBSTACULO_RETO_ORBITA_MS = 2000;
 // ------------------------------------------------------------
 // Confirmação de linha durante obstáculo
 // ------------------------------------------------------------
+//
+// Qualquer um dos 8 sensores pode detectar preto.
+//
+// É necessário detectar preto em várias atualizações
+// consecutivas para evitar que um ruído isolado encerre
+// a órbita.
+//
+// ------------------------------------------------------------
 
 static constexpr int LEITURAS_PRETAS_CONFIRMAR_OBSTACULO = 3;
 
@@ -113,13 +121,6 @@ MaquinaEstados::MaquinaEstados(
 
 
     leiturasPretasObstaculo = 0;
-
-
-    // --------------------------------------------------------
-    // Inicialmente o robô pode detectar obstáculos normalmente.
-    // --------------------------------------------------------
-
-    bloquearNovoObstaculo = false;
 }
 
 
@@ -164,8 +165,6 @@ void MaquinaEstados::begin()
 
     leiturasPretasObstaculo = 0;
 
-    bloquearNovoObstaculo = false;
-
 
     controleLinha.stop();
 
@@ -196,8 +195,6 @@ void MaquinaEstados::resetExecucao()
     inicioTrechoObstaculo = 0;
 
     leiturasPretasObstaculo = 0;
-
-    bloquearNovoObstaculo = false;
 
 
     controleLinha.stop();
@@ -355,39 +352,6 @@ void MaquinaEstados::processarSeguindoLinha(
     const LinhaData& linha
 )
 {
-    // --------------------------------------------------------
-    // Se acabamos de sair de uma manobra de obstáculo,
-    // o ToF pode ainda estar vendo o MESMO obstáculo.
-    //
-    // Nesse período NÃO iniciamos uma nova manobra.
-    //
-    // O robô continua seguindo a linha normalmente.
-    // --------------------------------------------------------
-
-    if(
-        bloquearNovoObstaculo
-    )
-    {
-        controleLinha.update(linha);
-
-
-        // ----------------------------------------------------
-        // Somente quando o ToF deixar de detectar o obstáculo
-        // liberamos uma futura detecção.
-        // ----------------------------------------------------
-
-        if(
-            !analiseTOF.temObstaculo()
-        )
-        {
-            bloquearNovoObstaculo = false;
-        }
-
-
-        return;
-    }
-
-
     // --------------------------------------------------------
     // Obstáculo tem prioridade.
     // --------------------------------------------------------
@@ -865,6 +829,10 @@ void MaquinaEstados::processarObstaculo(
 
         case OBSTACULO_GIRO_1:
 
+            // ------------------------------------------------
+            // Não procuramos preto durante o giro.
+            // ------------------------------------------------
+
             controleGiro.update();
 
 
@@ -881,10 +849,14 @@ void MaquinaEstados::processarObstaculo(
 
 
         // ====================================================
-        // PRIMEIRO RETO
+        // PRIMEIRO RETO - 500 ms
         // ====================================================
 
         case OBSTACULO_RETO_INICIAL:
+
+            // ------------------------------------------------
+            // Aqui procuramos preto continuamente.
+            // ------------------------------------------------
 
             controleObstaculo.update();
 
@@ -917,6 +889,11 @@ void MaquinaEstados::processarObstaculo(
                 controleObstaculo.parar();
 
 
+                // ------------------------------------------------
+                // Primeira curva da órbita:
+                // esquerda.
+                // ------------------------------------------------
+
                 controleGiro.curva90Esquerda();
 
 
@@ -933,6 +910,10 @@ void MaquinaEstados::processarObstaculo(
         // ====================================================
 
         case OBSTACULO_GIRO_2:
+
+            // ------------------------------------------------
+            // Não procuramos preto durante o giro.
+            // ------------------------------------------------
 
             controleGiro.update();
 
@@ -955,6 +936,10 @@ void MaquinaEstados::processarObstaculo(
 
         case OBSTACULO_ORBITA_RETO:
 
+            // ------------------------------------------------
+            // Procuramos preto continuamente.
+            // ------------------------------------------------
+
             controleObstaculo.update();
 
 
@@ -967,6 +952,12 @@ void MaquinaEstados::processarObstaculo(
                 motores.stop();
 
 
+                // ------------------------------------------------
+                // Encontrou linha.
+                //
+                // Agora vira 90° para a direita.
+                // ------------------------------------------------
+
                 controleGiro.curva90Direita();
 
 
@@ -978,6 +969,10 @@ void MaquinaEstados::processarObstaculo(
             }
 
 
+            // ------------------------------------------------
+            // Terminou os 1500 ms.
+            // ------------------------------------------------
+
             if(
                 millis() -
                 inicioTrechoObstaculo
@@ -987,6 +982,12 @@ void MaquinaEstados::processarObstaculo(
             {
                 controleObstaculo.parar();
 
+
+                // ------------------------------------------------
+                // Próximo giro da órbita.
+                //
+                // Sempre esquerda.
+                // ------------------------------------------------
 
                 controleGiro.curva90Esquerda();
 
@@ -1004,6 +1005,10 @@ void MaquinaEstados::processarObstaculo(
         // ====================================================
 
         case OBSTACULO_ORBITA_GIRO:
+
+            // ------------------------------------------------
+            // NÃO procuramos preto durante o giro.
+            // ------------------------------------------------
 
             controleGiro.update();
 
@@ -1026,6 +1031,10 @@ void MaquinaEstados::processarObstaculo(
 
         case OBSTACULO_GIRO_FINAL:
 
+            // ------------------------------------------------
+            // Preto não é procurado durante este giro.
+            // ------------------------------------------------
+
             controleGiro.update();
 
 
@@ -1033,30 +1042,7 @@ void MaquinaEstados::processarObstaculo(
                 controleGiro.terminou()
             )
             {
-                // ------------------------------------------------
-                // A manobra de obstáculo terminou.
-                //
-                // A partir deste ponto a máquina volta
-                // definitivamente para o segue-linha.
-                // ------------------------------------------------
-
-                controleGiro.cancelar();
-
-                controleObstaculo.parar();
-
                 controleLinha.start();
-
-
-                // ------------------------------------------------
-                // IMPORTANTE:
-                //
-                // O ToF pode continuar acusando o mesmo
-                // obstáculo. Bloqueamos uma NOVA manobra
-                // até que o ToF deixe de detectá-lo.
-                // ------------------------------------------------
-
-                bloquearNovoObstaculo = true;
-
 
                 entrarEstado(
                     SEGUINDO_LINHA
@@ -1075,6 +1061,31 @@ void MaquinaEstados::processarObstaculo(
 
 // ============================================================
 // CONFIRMAR PRETO DURANTE OBSTÁCULO
+// ============================================================
+//
+// Qualquer dos 8 sensores pode disparar.
+//
+// Exemplo:
+//
+// sensor 0 preto
+// sensor 0 preto
+// sensor 0 preto
+//
+// ou:
+//
+// sensor 3 preto
+// sensor 3 preto
+// sensor 3 preto
+//
+// ou até sensores diferentes:
+//
+// sensor 2 preto
+// sensor 4 preto
+// sensor 5 preto
+//
+// O que importa é existir pelo menos um sensor preto
+// em cada atualização consecutiva.
+//
 // ============================================================
 
 bool MaquinaEstados::linhaPretaConfirmada(
@@ -1119,6 +1130,10 @@ bool MaquinaEstados::linhaPretaConfirmada(
     }
     else
     {
+        // ----------------------------------------------------
+        // Se perdeu o preto, a sequência consecutiva quebra.
+        // ----------------------------------------------------
+
         leiturasPretasObstaculo = 0;
     }
 

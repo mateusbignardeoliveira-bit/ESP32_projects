@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 
-#include "../hardware/TOF200F.h"
+#include "../Hardware/TOF200F.h"
 
 
 class TOFAnalise
@@ -14,9 +14,9 @@ private:
     TOF200F& tof;
 
 
-    // --------------------------------------------------------
-    // Estado
-    // --------------------------------------------------------
+    // ========================================================
+    // ESTADO
+    // ========================================================
 
     int distancia;
 
@@ -25,25 +25,24 @@ private:
     bool obstaculo;
 
 
-    // --------------------------------------------------------
+    // ========================================================
     // HISTERese
-    // --------------------------------------------------------
+    // ========================================================
 
-    // Para confirmar obstáculo, a leitura precisa estar
-    // realmente próxima.
+    // Confirma obstáculo somente realmente perto.
     static constexpr int DISTANCIA_CONFIRMACAO_MM = 80;
 
 
-    // Depois de confirmado, só consideramos que o obstáculo
-    // desapareceu quando a distância estiver claramente maior.
+    // Para liberar precisa estar claramente longe.
     static constexpr int DISTANCIA_LIBERACAO_MM = 120;
 
 
-    // Quantidade de leituras consecutivas para confirmar.
+    // ========================================================
+    // CONFIRMAÇÃO
+    // ========================================================
+
     static constexpr int LEITURAS_PARA_CONFIRMAR = 5;
 
-
-    // Quantidade de leituras consecutivas para liberar.
     static constexpr int LEITURAS_PARA_LIBERAR = 3;
 
 
@@ -71,12 +70,16 @@ public:
     bool temObstaculo() const;
 
 
-    // Retorna o limite principal usado na detecção
     int getLimiteObstaculo();
 
 
-    // Quantidade atual de leituras próximas
     int getLeiturasBaixas() const;
+
+
+    int getLeiturasAltas() const;
+
+
+    void reset();
 
 };
 

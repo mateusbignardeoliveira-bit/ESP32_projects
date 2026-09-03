@@ -3,8 +3,6 @@
 
 #include <Arduino.h>
 
-#include "../Hardware/MotorControlador.h"
-
 #include "../sensores/LinhaAnalise.h"
 #include "../sensores/AS7341Analise.h"
 #include "../sensores/TOFAnalise.h"
@@ -15,14 +13,12 @@
 #include "../controle/ControleObstaculo.h"
 #include "../controle/Verde.h"
 
+#include "../Hardware/MotorControlador.h"
+
 
 class MaquinaEstados
 {
 public:
-
-    // ========================================================
-    // ESTADOS
-    // ========================================================
 
     enum Estado
     {
@@ -37,34 +33,23 @@ public:
         BUSCANDO_LINHA,
 
         // ----------------------------------------------------
-        // OBSTÁCULO
+        // Obstáculo
         // ----------------------------------------------------
 
         OBSTACULO_GIRO_1,
-
         OBSTACULO_RETO_INICIAL,
-
         OBSTACULO_GIRO_2,
 
         OBSTACULO_ORBITA_RETO,
-
         OBSTACULO_ORBITA_GIRO,
 
         OBSTACULO_GIRO_FINAL,
-
-        // ----------------------------------------------------
-        // STOPS
-        // ----------------------------------------------------
 
         STOP_CINZA,
 
         STOP_VERMELHO
     };
 
-
-    // ========================================================
-    // AÇÕES DE GIRO
-    // ========================================================
 
     enum AcaoGiro
     {
@@ -78,44 +63,35 @@ public:
     };
 
 
-    // ========================================================
-    // CONSTRUTOR
-    // ========================================================
-
     MaquinaEstados(
         LinhaAnalise& linha,
-        AS7341Analise& corEsq,
-        AS7341Analise& corDir,
+        AS7341Analise& corEsquerda,
+        AS7341Analise& corDireita,
         Verde& verde,
         TOFAnalise& tof,
         IMU& imu,
-        ControleLinha& controleLinhaRef,
-        ControleGiro& controleGiroRef,
-        ControleObstaculo& controleObstaculoRef,
-        MotorControlador& motoresRef
+        ControleLinha& controleLinha,
+        ControleGiro& controleGiro,
+        ControleObstaculo& controleObstaculo,
+        MotorControlador& motores
     );
 
-
-    // ========================================================
-    // CONTROLE
-    // ========================================================
 
     void begin();
 
-    void update(
-        const LinhaData& linha,
-        const AS7341Data& dadosCorEsquerda,
-        const AS7341Data& dadosCorDireita
-    );
 
     void resetExecucao();
 
 
-    // ========================================================
-    // ESTADO
-    // ========================================================
+    void update(
+        const LinhaData& dadosLinha,
+        const AS7341Data& dadosCorEsquerda,
+        const AS7341Data& dadosCorDireita
+    );
+
 
     Estado getEstado() const;
+
 
     bool parado() const;
 
@@ -124,20 +100,21 @@ public:
     bool paradoPorCinza() const;
 
 
-    // ========================================================
-    // STOPS
-    // ========================================================
+    // --------------------------------------------------------
+    // Vermelho
+    // --------------------------------------------------------
 
     void pararPorVermelho();
+
+
+    // --------------------------------------------------------
+    // Cinza
+    // --------------------------------------------------------
 
     void pararPorCinza();
 
 
 private:
-
-    // ========================================================
-    // REFERÊNCIAS
-    // ========================================================
 
     LinhaAnalise& analiseLinha;
 
@@ -151,6 +128,7 @@ private:
 
     IMU& sensorIMU;
 
+
     ControleLinha& controleLinha;
 
     ControleGiro& controleGiro;
@@ -160,18 +138,21 @@ private:
     MotorControlador& motores;
 
 
-    // ========================================================
-    // ESTADO ATUAL
-    // ========================================================
-
     Estado estado;
 
     AcaoGiro acaoGiro;
 
 
-    // ========================================================
-    // AVALIAÇÃO
-    // ========================================================
+    // --------------------------------------------------------
+    // Tendência antes da avaliação
+    // --------------------------------------------------------
+
+    float tendenciaAntes;
+
+
+    // --------------------------------------------------------
+    // Avaliação
+    // --------------------------------------------------------
 
     unsigned long inicioAvaliacao;
 
@@ -179,21 +160,19 @@ private:
 
     unsigned long tempoMaximoAvaliacao;
 
-    float tendenciaAntes;
 
-
-    // ========================================================
-    // BUSCA
-    // ========================================================
+    // --------------------------------------------------------
+    // Busca normal
+    // --------------------------------------------------------
 
     unsigned long inicioBusca;
 
     unsigned long tempoMaximoBusca;
 
 
-    // ========================================================
-    // OBSTÁCULO
-    // ========================================================
+    // --------------------------------------------------------
+    // Obstáculo
+    // --------------------------------------------------------
 
     unsigned long inicioTrechoObstaculo;
 
@@ -201,57 +180,29 @@ private:
 
     unsigned long tempoRetoObstaculoOrbita;
 
-
-    // ========================================================
-    // CONFIRMAÇÃO DE LINHA NO OBSTÁCULO
-    // ========================================================
-
+    // Número de leituras consecutivas com preto
+    // necessárias para confirmar a linha.
     int leiturasPretasObstaculo;
 
 
-    // ========================================================
-    // TRAVA APÓS FINALIZAR OBSTÁCULO
-    // ========================================================
-    //
-    // Depois que a linha é encontrada e o robô termina o
-    // giro final, o ToF pode continuar detectando o mesmo
-    // obstáculo por algum tempo.
-    //
-    // Essa trava impede que a máquina imediatamente
-    // reinicie uma nova manobra de obstáculo.
-    //
-    // A trava só é liberada quando o ToF deixar de
-    // detectar o obstáculo.
-    //
-
-    bool bloquearNovoObstaculo;
-
-
-    // ========================================================
-    // MÉTODOS
-    // ========================================================
+    // --------------------------------------------------------
+    // Funções internas
+    // --------------------------------------------------------
 
     void entrarEstado(
         Estado novoEstado
     );
 
 
-    // --------------------------------------------------------
-    // Linha
-    // --------------------------------------------------------
-
     void processarSeguindoLinha(
         const LinhaData& linha
     );
 
 
-    // --------------------------------------------------------
-    // Avaliação
-    // --------------------------------------------------------
-
     void iniciarAvaliacao(
         const LinhaData& linha
     );
+
 
     void processarAvaliacao(
         const LinhaData& linha,
@@ -259,29 +210,20 @@ private:
         const AS7341Data& dadosCorDireita
     );
 
+
     void finalizarAvaliacao(
         const LinhaData& linha
     );
 
 
-    // --------------------------------------------------------
-    // Giros normais
-    // --------------------------------------------------------
-
     void iniciarGiro(
         AcaoGiro acao
     );
 
+
     void processarGiro(
         const LinhaData& linha
     );
-
-
-    // --------------------------------------------------------
-    // Ré antes de curvas
-    // --------------------------------------------------------
-
-    void reAntesDaCurva();
 
 
     // --------------------------------------------------------
@@ -290,13 +232,16 @@ private:
 
     void iniciarObstaculo();
 
-    void iniciarRetoObstaculo(
-        unsigned long duracao
-    );
 
     void processarObstaculo(
         const LinhaData& linha
     );
+
+
+    void iniciarRetoObstaculo(
+        unsigned long duracao
+    );
+
 
     bool linhaPretaConfirmada(
         const LinhaData& linha
@@ -304,27 +249,32 @@ private:
 
 
     // --------------------------------------------------------
-    // Busca normal
+    // Busca
     // --------------------------------------------------------
 
     void iniciarBuscaLinha();
+
 
     bool linhaEncontrada(
         const LinhaData& linha
     );
 
 
-    // --------------------------------------------------------
-    // Sensores de linha
-    // --------------------------------------------------------
-
     bool todosBrancos(
         const LinhaData& linha
     );
 
+
     int contarSensoresPretos(
         const LinhaData& linha
     );
+
+
+    // --------------------------------------------------------
+    // Ré antes de curvas normais
+    // --------------------------------------------------------
+
+    void reAntesDaCurva();
 };
 
 #endif

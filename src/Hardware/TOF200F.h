@@ -19,11 +19,11 @@ private:
     uint8_t canal;
 
 
-    // --------------------------------------------------------
-    // Filtro da distância
-    // --------------------------------------------------------
+    // ========================================================
+    // FILTRO
+    // ========================================================
 
-    static const int NUM_LEITURAS = 3;
+    static constexpr int NUM_LEITURAS = 3;
 
     int leituras[NUM_LEITURAS];
 
@@ -36,9 +36,9 @@ private:
     int distanciaAtual;
 
 
-    // --------------------------------------------------------
-    // Última leitura individual
-    // --------------------------------------------------------
+    // ========================================================
+    // ÚLTIMA LEITURA
+    // ========================================================
 
     int ultimaLeitura;
 
@@ -47,11 +47,32 @@ private:
     bool ultimaLeituraValida;
 
 
-    // --------------------------------------------------------
-    // Correção de calibração
-    // --------------------------------------------------------
+    // ========================================================
+    // CONTROLE DE RECUPERAÇÃO
+    // ========================================================
+
+    int leiturasInvalidas;
+
+    static constexpr int LIMITE_INVALIDAS_REINICIO = 10;
+
+
+    // ========================================================
+    // CALIBRAÇÃO
+    // ========================================================
 
     static constexpr int OFFSET_CORRECAO_MM = -20;
+
+
+    // ========================================================
+    // CONFIGURAÇÃO
+    // ========================================================
+
+    static constexpr uint16_t PERIODO_MEDICAO_MS = 25;
+
+
+    void limparFiltro();
+
+    bool reiniciarMedicao();
 
 
 public:
@@ -66,7 +87,7 @@ public:
     );
 
 
-    // Não bloqueante
+    // Atualiza o sensor sem bloquear
     void update();
 
 
@@ -78,12 +99,16 @@ public:
     int getUltimaLeitura();
 
 
-    // Indica se uma nova medição foi recebida
+    // Existe uma nova medição disponível?
     bool temNovaLeitura();
 
 
-    // Indica se a última medição foi válida
+    // A última medição foi válida?
     bool ultimaLeituraValidaAgora();
+
+
+    // Reinicia completamente o estado lógico do sensor
+    void reset();
 
 };
 

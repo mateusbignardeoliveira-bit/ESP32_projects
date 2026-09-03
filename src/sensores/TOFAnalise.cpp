@@ -30,7 +30,7 @@ tof(sensor)
 void TOFAnalise::update()
 {
     // --------------------------------------------------------
-    // Mantém a distância filtrada disponível para consulta.
+    // Sempre deixa a distância filtrada disponível.
     // --------------------------------------------------------
 
     distancia =
@@ -38,58 +38,60 @@ void TOFAnalise::update()
 
 
     // --------------------------------------------------------
-    // Só processa quando o VL53L0X realmente terminou uma
-    // nova medição.
+    // Só processa uma nova medição.
     // --------------------------------------------------------
 
-    if(!tof.temNovaLeitura())
+    if(
+        !tof.temNovaLeitura()
+    )
     {
         return;
     }
 
 
-    // --------------------------------------------------------
-    // Leitura inválida
-    // --------------------------------------------------------
+    // ========================================================
+    // LEITURA INVÁLIDA
+    // ========================================================
 
     if(!tof.ultimaLeituraValidaAgora())
-    {
-        valido = false;
+{
+    valido = false;
 
-        // Leitura inválida não pode confirmar obstáculo.
-        leiturasBaixas = 0;
+    // Leitura inválida = não há obstáculo confirmado.
+    obstaculo = false;
 
-        // Também não usamos como evidência de que o
-        // obstáculo desapareceu.
-        leiturasAltas = 0;
+    // Zera todas as sequências.
+    leiturasBaixas = 0;
+    leiturasAltas = 0;
 
-        return;
-    }
+    return;
+}
 
+
+    // ========================================================
+    // LEITURA VÁLIDA
+    // ========================================================
 
     valido = true;
 
-
-    // --------------------------------------------------------
-    // Usa a leitura INDIVIDUAL real.
-    // --------------------------------------------------------
 
     int leitura =
         tof.getUltimaLeitura();
 
 
     // ========================================================
-    // OBSTÁCULO AINDA NÃO CONFIRMADO
+    // SEM OBSTÁCULO
     // ========================================================
 
-    if(!obstaculo)
+    if(
+        !obstaculo
+    )
     {
-
         leiturasAltas = 0;
 
 
         // ----------------------------------------------------
-        // Só consideramos "perto" abaixo de 80 mm.
+        // Muito perto
         // ----------------------------------------------------
 
         if(
@@ -107,34 +109,34 @@ void TOFAnalise::update()
             {
                 obstaculo = true;
 
-                // Começamos uma nova contagem de liberação.
+                leiturasBaixas = 0;
+
                 leiturasAltas = 0;
             }
         }
         else
         {
             // ------------------------------------------------
-            // Qualquer leitura acima de 80 mm quebra a
-            // sequência de confirmação.
+            // Quebrou a sequência.
             // ------------------------------------------------
 
             leiturasBaixas = 0;
         }
+
 
         return;
     }
 
 
     // ========================================================
-    // OBSTÁCULO JÁ CONFIRMADO
+    // OBSTÁCULO CONFIRMADO
     // ========================================================
 
     leiturasBaixas = 0;
 
 
     // --------------------------------------------------------
-    // Só liberamos o obstáculo quando houver distância
-    // claramente maior que 120 mm.
+    // Só libera acima de 120 mm.
     // --------------------------------------------------------
 
     if(
@@ -158,9 +160,7 @@ void TOFAnalise::update()
     else
     {
         // ----------------------------------------------------
-        // Zona abaixo de 120 mm mantém o obstáculo.
-        //
-        // Isso inclui a zona neutra de 80..120 mm.
+        // Continua dentro da zona de obstáculo.
         // ----------------------------------------------------
 
         leiturasAltas = 0;
@@ -209,10 +209,38 @@ int TOFAnalise::getLimiteObstaculo()
 
 
 // ============================================================
-// CONTADOR
+// LEITURAS BAIXAS
 // ============================================================
 
 int TOFAnalise::getLeiturasBaixas() const
 {
     return leiturasBaixas;
+}
+
+
+// ============================================================
+// LEITURAS ALTAS
+// ============================================================
+
+int TOFAnalise::getLeiturasAltas() const
+{
+    return leiturasAltas;
+}
+
+
+// ============================================================
+// RESET
+// ============================================================
+
+void TOFAnalise::reset()
+{
+    distancia = 0;
+
+    valido = false;
+
+    obstaculo = false;
+
+    leiturasBaixas = 0;
+
+    leiturasAltas = 0;
 }

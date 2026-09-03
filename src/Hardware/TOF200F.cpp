@@ -1,6 +1,10 @@
 #include "TOF200F.h"
 
 
+// ============================================================
+// CONSTRUTOR
+// ============================================================
+
 TOF200F::TOF200F(
     TCA& multiplexador
 )
@@ -23,6 +27,8 @@ tca(multiplexador)
 
     ultimaLeituraValida = false;
 
+    leiturasInvalidas = 0;
+
 
     for(
         int i = 0;
@@ -35,32 +41,12 @@ tca(multiplexador)
 }
 
 
-bool TOF200F::begin(
-    uint8_t canalTCA
-)
+// ============================================================
+// LIMPA FILTRO
+// ============================================================
+
+void TOF200F::limparFiltro()
 {
-    canal = canalTCA;
-
-
-    if(!tca.selecionarCanal(
-        canal
-    ))
-    {
-        return false;
-    }
-
-
-    if(!lox.begin(0x29))
-    {
-        return false;
-    }
-
-
-    lox.setMeasurementTimingBudgetMicroSeconds(
-        20000
-    );
-
-
     indiceLeitura = 0;
 
     totalSoma = 0;
@@ -69,12 +55,6 @@ bool TOF200F::begin(
 
     distanciaAtual = 0;
 
-    ultimaLeitura = 0;
-
-    novaLeitura = false;
-
-    ultimaLeituraValida = false;
-
 
     for(
         int i = 0;
@@ -84,93 +64,251 @@ bool TOF200F::begin(
     {
         leituras[i] = 0;
     }
+}
 
 
-    lox.startRangeContinuous(
-        20
-    );
+// ============================================================
+// BEGIN
+// ============================================================
+
+bool TOF200F::begin(
+    uint8_t canalTCA
+)
+{
+    canal = canalTCA;
+
+
+    // --------------------------------------------------------
+    // Seleciona o canal
+    // --------------------------------------------------------
+
+    if(
+        !tca.selecionarCanal(
+            canal
+        )
+    )
+    {
+        return false;
+    }
+
+
+    // --------------------------------------------------------
+    // Inicializa VL53L0X
+    // --------------------------------------------------------
+
+    if(
+        !lox.begin(0x29)
+    )
+    {
+        return false;
+    }
+
+
+    // --------------------------------------------------------
+    // Configuração do tempo de medição
+    // --------------------------------------------------------
+
+    if(
+        !lox.setMeasurementTimingBudgetMicroSeconds(
+            20000
+        )
+    )
+    {
+        return false;
+    }
+
+
+    // --------------------------------------------------------
+    // Estado inicial
+    // --------------------------------------------------------
+
+    limparFiltro();
+
+    ultimaLeitura = 0;
+
+    novaLeitura = false;
+
+    ultimaLeituraValida = false;
+
+    leiturasInvalidas = 0;
+
+
+    // --------------------------------------------------------
+    // Modo CONTÍNUO
+    // --------------------------------------------------------
+
+    if(
+        !lox.startRangeContinuous(
+            PERIODO_MEDICAO_MS
+        )
+    )
+    {
+        return false;
+    }
 
 
     return true;
 }
 
 
+// ============================================================
+// REINICIA MEDIÇÃO
+// ============================================================
+
+bool TOF200F::reiniciarMedicao()
+{
+    // --------------------------------------------------------
+    // Para o modo contínuo atual
+    // --------------------------------------------------------
+
+    lox.stopRangeContinuous();
+
+    delay(5);
+
+
+    // --------------------------------------------------------
+    // Limpa estado do sensor
+    // --------------------------------------------------------
+
+    limparFiltro();
+
+    ultimaLeitura = 0;
+
+    novaLeitura = false;
+
+    ultimaLeituraValida = false;
+
+    leiturasInvalidas = 0;
+
+
+    // --------------------------------------------------------
+    // Reinicia modo contínuo
+    // --------------------------------------------------------
+
+    return lox.startRangeContinuous(
+        PERIODO_MEDICAO_MS
+    );
+}
+
+
+// ============================================================
+// UPDATE
+// ============================================================
+
 void TOF200F::update()
 {
     // --------------------------------------------------------
-    // Por padrão não existe nova leitura nesta chamada.
+    // Por padrão não há nova leitura.
     // --------------------------------------------------------
 
     novaLeitura = false;
 
 
     // --------------------------------------------------------
-    // Seleciona o canal do TCA
+    // Seleciona novamente o canal do TCA.
     // --------------------------------------------------------
 
-    if(!tca.selecionarCanal(
-        canal
-    ))
+    if(
+        !tca.selecionarCanal(
+            canal
+        )
+    )
     {
         return;
     }
 
 
     // --------------------------------------------------------
-    // Ainda não terminou uma nova medição
+    // Ainda não terminou uma medição.
     // --------------------------------------------------------
 
-    if(!lox.isRangeComplete())
+    if(
+        !lox.isRangeComplete()
+    )
     {
         return;
     }
 
 
-    // --------------------------------------------------------
-    // Lê a medição
-    // --------------------------------------------------------
+    // ========================================================
+    // LEITURA CONTÍNUA
+    // ========================================================
+    //
+    // IMPORTANTE:
+    //
+    // NÃO usar readRange() aqui.
+    //
+    // readRange() = single shot
+    //
+    // readRangeResult() = resultado do modo contínuo
+    //
+    // ========================================================
 
     uint16_t leituraBruta =
-        lox.readRange();
-
-
-    // A partir daqui existe uma nova medição,
-    // mesmo que ela seja inválida.
-
-    novaLeitura = true;
+        lox.readRangeResult();
 
 
     // --------------------------------------------------------
-    // Verifica o status REAL da medição
+    // Depois de readRangeResult(), o status da medição
+    // fica disponível através de readRangeStatus().
     // --------------------------------------------------------
 
     uint8_t status =
         lox.readRangeStatus();
 
 
-    // --------------------------------------------------------
-    // SOMENTE STATUS 0 É ACEITO
-    //
-    // Status 0 = Range Valid
-    //
-    // Status 2 = Signal Fail
-    // Status 4 = Phase Fail
-    //
-    // Leituras com qualquer outro status não entram
-    // no filtro e não podem confirmar obstáculo.
-    // --------------------------------------------------------
+    novaLeitura = true;
 
-    if(status != 0)
+
+    // ========================================================
+    // LEITURA INVÁLIDA
+    // ========================================================
+
+    if(
+        status != 0
+    )
     {
+        ultimaLeituraValida = false;
+
         ultimaLeitura = 0;
 
-        ultimaLeituraValida = false;
+        leiturasInvalidas++;
+
+
+        // ----------------------------------------------------
+        // Não altera o filtro.
+        //
+        // Não transforma uma leitura inválida em distância.
+        // ----------------------------------------------------
+
+
+        // ----------------------------------------------------
+        // Se o sensor ficar preso em erro por muitas leituras,
+        // reinicia somente a medição.
+        //
+        // NÃO altera a lógica de obstáculo.
+        // ----------------------------------------------------
+
+        if(
+            leiturasInvalidas >=
+            LIMITE_INVALIDAS_REINICIO
+        )
+        {
+            reiniciarMedicao();
+        }
+
 
         return;
     }
 
 
+    // ========================================================
+    // LEITURA VÁLIDA
+    // ========================================================
+
     ultimaLeituraValida = true;
+
+    leiturasInvalidas = 0;
 
 
     // --------------------------------------------------------
@@ -191,19 +329,16 @@ void TOF200F::update()
 
 
     // --------------------------------------------------------
-    // Guarda a última leitura individual
+    // Guarda última leitura individual
     // --------------------------------------------------------
 
     ultimaLeitura =
         leituraCalibrada;
 
 
-    // --------------------------------------------------------
-    // Filtro de média móvel
-    //
-    // IMPORTANTE:
-    // somente leituras válidas entram no filtro.
-    // --------------------------------------------------------
+    // ========================================================
+    // FILTRO DE MÉDIA MÓVEL
+    // ========================================================
 
     if(
         quantidadeLeituras < NUM_LEITURAS
@@ -218,6 +353,7 @@ void TOF200F::update()
         quantidadeLeituras++;
 
         indiceLeitura++;
+
 
         if(
             indiceLeitura >= NUM_LEITURAS
@@ -238,6 +374,7 @@ void TOF200F::update()
             leituraCalibrada;
 
         indiceLeitura++;
+
 
         if(
             indiceLeitura >= NUM_LEITURAS
@@ -263,11 +400,19 @@ void TOF200F::update()
 }
 
 
+// ============================================================
+// DISTÂNCIA
+// ============================================================
+
 int TOF200F::getDistance()
 {
     return distanciaAtual;
 }
 
+
+// ============================================================
+// ÚLTIMA LEITURA
+// ============================================================
 
 int TOF200F::getUltimaLeitura()
 {
@@ -275,13 +420,39 @@ int TOF200F::getUltimaLeitura()
 }
 
 
+// ============================================================
+// NOVA LEITURA
+// ============================================================
+
 bool TOF200F::temNovaLeitura()
 {
     return novaLeitura;
 }
 
 
+// ============================================================
+// VALIDADE
+// ============================================================
+
 bool TOF200F::ultimaLeituraValidaAgora()
 {
     return ultimaLeituraValida;
+}
+
+
+// ============================================================
+// RESET
+// ============================================================
+
+void TOF200F::reset()
+{
+    limparFiltro();
+
+    ultimaLeitura = 0;
+
+    novaLeitura = false;
+
+    ultimaLeituraValida = false;
+
+    leiturasInvalidas = 0;
 }
