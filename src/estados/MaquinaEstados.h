@@ -112,6 +112,8 @@ public:
 
     void setLadoObstaculo(int lado);
 
+    void pararPorCinza();
+
 
 private:
 
@@ -251,9 +253,6 @@ private:
     int contarSensoresPretos(
         const LinhaData& linha
     );
-
-
-    void pararPorCinza();
 
 
 };

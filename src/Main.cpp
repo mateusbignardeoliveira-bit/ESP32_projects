@@ -656,14 +656,9 @@ void loop()
     // ========================================================
     // BOTÃO
     //
-    // Neste ponto:
+    // O botão vem antes do cinza.
     //
-    // - cinza pode ser interrompido
-    // - obstáculo pode ser interrompido
-    // - curva pode ser interrompida
-    // - segue linha pode ser interrompido
-    //
-    // Vermelho já foi tratado acima.
+    // Assim, um STOP_CINZA pode ser resetado pelo botão.
     // ========================================================
 
     if(
@@ -697,6 +692,8 @@ void loop()
     //
     // Não recalibra IMU.
     // Não zera heading.
+    //
+    // Isso também limpa um eventual STOP_CINZA.
     // ========================================================
 
     if(
@@ -713,6 +710,28 @@ void loop()
 
         roboParadoPorInterruptor =
             false;
+    }
+
+
+    // ========================================================
+    // CINZA
+    //
+    // Cinza PARA o robô, mas NÃO é uma trava absoluta.
+    //
+    // O botão continua tendo prioridade para permitir
+    // resetExecucao() e início de um novo ciclo.
+    // ========================================================
+
+    if(
+        resultadoCorEsquerda.cinzaDetectado ||
+        resultadoCorDireita.cinzaDetectado
+    )
+    {
+        maquinaEstados.pararPorCinza();
+
+        atualizarLEDs();
+
+        return;
     }
 
 
