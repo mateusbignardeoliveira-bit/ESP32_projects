@@ -70,9 +70,9 @@ static const float LIMIAR_VERDE_F4_F6_MIN = 1.10f;
 // Usamos margem considerável para evitar falso positivo.
 // ============================================================
 
-static const float LIMIAR_VERMELHO_R_G_MIN = 4.0f;
-static const float LIMIAR_VERMELHO_R_B_MIN = 4.0f;
-static const float LIMIAR_VERMELHO_R_CLEAR_MIN = 0.58f;
+static const float LIMIAR_VERMELHO_R_G_MIN = 3.0f;
+static const float LIMIAR_VERMELHO_R_B_MIN = 3.0f;
+static const float LIMIAR_VERMELHO_R_CLEAR_MIN = 0.56f;
 
 
 // ============================================================

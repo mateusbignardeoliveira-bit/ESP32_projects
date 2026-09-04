@@ -86,7 +86,7 @@ static constexpr int LADO_OBSTACULO = 1;
 // seja interpretado como uma marca real.
 //
 
-static constexpr int LEITURAS_VERMELHO_NECESSARIAS = 15;
+static constexpr int LEITURAS_VERMELHO_NECESSARIAS = 10;
 
 static constexpr int LEITURAS_CINZA_NECESSARIAS = 10;
 
