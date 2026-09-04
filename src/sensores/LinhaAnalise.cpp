@@ -114,8 +114,12 @@ void LinhaAnalise::update(
         }
 
 
+        // Sensor considerado sobre preto.
+        // Reduzido de 0.20 para 0.05 para
+        // detectar a linha preta real medida.
         if(
-            resultado.sensores[i] >= 0.20f
+            resultado.sensores[i] >=
+            LIMIAR_SENSOR_ATIVO
         )
         {
             sensoresAtivos++;
@@ -123,13 +127,21 @@ void LinhaAnalise::update(
     }
 
 
-    // Detecta a linha
+    // ============================================================
+    // DETECÇÃO DA LINHA
+    // ============================================================
 
+    // Basta um sensor apresentar uma intensidade
+    // igual ou superior ao limiar para considerar
+    // que existe linha nesta leitura.
     resultado.linhaDetectada =
-        maiorIntensidade >= 0.08f;
+        maiorIntensidade >=
+        LIMIAR_DETECCAO;
 
 
-    // Calcula posição
+    // ============================================================
+    // POSIÇÃO DA LINHA
+    // ============================================================
 
     if(somaIntensidade > 0.01f)
     {
@@ -143,19 +155,25 @@ void LinhaAnalise::update(
     }
 
 
-    // Erro utilizado pelo PID
+    // ============================================================
+    // ERRO UTILIZADO PELO PID
+    // ============================================================
 
     resultado.erro =
         resultado.posicao;
 
 
-    // Intensidade total
+    // ============================================================
+    // INTENSIDADE TOTAL
+    // ============================================================
 
     resultado.intensidade =
         somaIntensidade;
 
 
-    // Quantidade de sensores ativos
+    // ============================================================
+    // QUANTIDADE DE SENSORES SOBRE PRETO
+    // ============================================================
 
     resultado.largura =
         (float)sensoresAtivos;

@@ -1,4 +1,4 @@
-#include "MaquinaEstados.h"
+ #include "MaquinaEstados.h"
 
 
 // ============================================================
@@ -50,18 +50,36 @@ static constexpr unsigned long OBSTACULO_RETO_ORBITA_MS = 2500;
 // ------------------------------------------------------------
 // Confirmação de linha durante obstáculo
 // ------------------------------------------------------------
-//
-// Qualquer um dos 8 sensores pode detectar preto.
-//
-// É necessário detectar preto em várias atualizações
-// consecutivas para evitar que um ruído isolado encerre
-// a órbita.
-//
-// ------------------------------------------------------------
 
 static constexpr int LEITURAS_PRETAS_CONFIRMAR_OBSTACULO = 3;
 
 static constexpr float LIMIAR_PRETO_OBSTACULO = 0.35f;
+
+
+// ============================================================
+// CONFIGURAÇÃO DA CURVA PRETA
+// ============================================================
+//
+// A curva preta NÃO usa o giroscópio.
+//
+// O robô gira de acordo com a tendência anterior:
+//
+// tendência < 0 -> direita
+// tendência > 0 -> esquerda
+//
+// O giro termina quando o sensor físico 4 ou 5
+// volta a detectar preto.
+//
+// LinhaData usa índice começando em 0:
+//
+// sensor físico 4 -> sensores[3]
+// sensor físico 5 -> sensores[4]
+//
+// ============================================================
+
+static constexpr float LIMIAR_PRETO_CURVA = 0.35f;
+
+static constexpr int VELOCIDADE_CURVA_PRETA = 100;
 
 
 // ============================================================
@@ -275,6 +293,17 @@ void MaquinaEstados::update(
         case EXECUTANDO_GIRO:
 
             processarGiro(linha);
+
+            break;
+
+
+        // ====================================================
+        // CURVA PRETA
+        // ====================================================
+
+        case CURVA_PRETA:
+
+            processarCurvaPreta(linha);
 
             break;
 
@@ -583,34 +612,7 @@ void MaquinaEstados::finalizarAvaliacao(
         todosBrancos(linha)
     )
     {
-        if(
-            tendenciaAntes < 0.0f
-        )
-        {
-            reAntesDaCurva();
-
-            iniciarGiro(
-                GIRO_DIREITA
-            );
-        }
-        else if(
-            tendenciaAntes > 0.0f
-        )
-        {
-            reAntesDaCurva();
-
-            iniciarGiro(
-                GIRO_ESQUERDA
-            );
-        }
-        else
-        {
-            controleLinha.start();
-
-            entrarEstado(
-                SEGUINDO_LINHA
-            );
-        }
+        iniciarCurvaPreta();
 
         return;
     }
@@ -713,6 +715,127 @@ void MaquinaEstados::processarGiro(
     entrarEstado(
         SEGUINDO_LINHA
     );
+}
+
+
+// ============================================================
+// INICIAR CURVA PRETA
+// ============================================================
+
+void MaquinaEstados::iniciarCurvaPreta()
+{
+    controleLinha.stop();
+
+    controleGiro.cancelar();
+
+    motores.stop();
+
+
+    // --------------------------------------------------------
+    // Tendência negativa = curva para a direita.
+    // --------------------------------------------------------
+
+    if(
+        tendenciaAntes < 0.0f
+    )
+    {
+        motores.setSpeed(
+            VELOCIDADE_CURVA_PRETA,
+            VELOCIDADE_CURVA_PRETA,
+            -VELOCIDADE_CURVA_PRETA,
+            -VELOCIDADE_CURVA_PRETA
+        );
+
+        entrarEstado(
+            CURVA_PRETA
+        );
+
+        return;
+    }
+
+
+    // --------------------------------------------------------
+    // Tendência positiva = curva para a esquerda.
+    // --------------------------------------------------------
+
+    if(
+        tendenciaAntes > 0.0f
+    )
+    {
+        motores.setSpeed(
+            -VELOCIDADE_CURVA_PRETA,
+            -VELOCIDADE_CURVA_PRETA,
+            VELOCIDADE_CURVA_PRETA,
+            VELOCIDADE_CURVA_PRETA
+        );
+
+        entrarEstado(
+            CURVA_PRETA
+        );
+
+        return;
+    }
+
+
+    // --------------------------------------------------------
+    // Sem tendência confiável.
+    // --------------------------------------------------------
+
+    controleLinha.start();
+
+    entrarEstado(
+        SEGUINDO_LINHA
+    );
+}
+
+
+// ============================================================
+// PROCESSAR CURVA PRETA
+// ============================================================
+//
+// Durante a curva preta NÃO usamos o giroscópio.
+//
+// O robô continua girando até que:
+//
+// sensor físico 4 OU sensor físico 5
+//
+// detecte preto.
+//
+// ============================================================
+
+void MaquinaEstados::processarCurvaPreta(
+    const LinhaData& linha
+)
+{
+    bool sensor4Preto =
+        linha.sensores[3] >=
+        LIMIAR_PRETO_CURVA;
+
+
+    bool sensor5Preto =
+        linha.sensores[4] >=
+        LIMIAR_PRETO_CURVA;
+
+
+    // --------------------------------------------------------
+    // Encontrou a linha.
+    // --------------------------------------------------------
+
+    if(
+        sensor4Preto ||
+        sensor5Preto
+    )
+    {
+        motores.stop();
+
+        controleLinha.start();
+
+        entrarEstado(
+            SEGUINDO_LINHA
+        );
+
+        return;
+    }
 }
 
 
@@ -849,14 +972,10 @@ void MaquinaEstados::processarObstaculo(
 
 
         // ====================================================
-        // PRIMEIRO RETO - 500 ms
+        // PRIMEIRO RETO
         // ====================================================
 
         case OBSTACULO_RETO_INICIAL:
-
-            // ------------------------------------------------
-            // Aqui procuramos preto continuamente.
-            // ------------------------------------------------
 
             controleObstaculo.update();
 
@@ -888,14 +1007,7 @@ void MaquinaEstados::processarObstaculo(
             {
                 controleObstaculo.parar();
 
-
-                // ------------------------------------------------
-                // Primeira curva da órbita:
-                // esquerda.
-                // ------------------------------------------------
-
                 controleGiro.curva90Esquerda();
-
 
                 entrarEstado(
                     OBSTACULO_GIRO_2
@@ -910,10 +1022,6 @@ void MaquinaEstados::processarObstaculo(
         // ====================================================
 
         case OBSTACULO_GIRO_2:
-
-            // ------------------------------------------------
-            // Não procuramos preto durante o giro.
-            // ------------------------------------------------
 
             controleGiro.update();
 
@@ -936,10 +1044,6 @@ void MaquinaEstados::processarObstaculo(
 
         case OBSTACULO_ORBITA_RETO:
 
-            // ------------------------------------------------
-            // Procuramos preto continuamente.
-            // ------------------------------------------------
-
             controleObstaculo.update();
 
 
@@ -951,15 +1055,7 @@ void MaquinaEstados::processarObstaculo(
 
                 motores.stop();
 
-
-                // ------------------------------------------------
-                // Encontrou linha.
-                //
-                // Agora vira 90° para a direita.
-                // ------------------------------------------------
-
                 controleGiro.curva90Direita();
-
 
                 entrarEstado(
                     OBSTACULO_GIRO_FINAL
@@ -968,10 +1064,6 @@ void MaquinaEstados::processarObstaculo(
                 break;
             }
 
-
-            // ------------------------------------------------
-            // Terminou os 1500 ms.
-            // ------------------------------------------------
 
             if(
                 millis() -
@@ -982,15 +1074,7 @@ void MaquinaEstados::processarObstaculo(
             {
                 controleObstaculo.parar();
 
-
-                // ------------------------------------------------
-                // Próximo giro da órbita.
-                //
-                // Sempre esquerda.
-                // ------------------------------------------------
-
                 controleGiro.curva90Esquerda();
-
 
                 entrarEstado(
                     OBSTACULO_ORBITA_GIRO
@@ -1005,10 +1089,6 @@ void MaquinaEstados::processarObstaculo(
         // ====================================================
 
         case OBSTACULO_ORBITA_GIRO:
-
-            // ------------------------------------------------
-            // NÃO procuramos preto durante o giro.
-            // ------------------------------------------------
 
             controleGiro.update();
 
@@ -1030,10 +1110,6 @@ void MaquinaEstados::processarObstaculo(
         // ====================================================
 
         case OBSTACULO_GIRO_FINAL:
-
-            // ------------------------------------------------
-            // Preto não é procurado durante este giro.
-            // ------------------------------------------------
 
             controleGiro.update();
 
@@ -1061,31 +1137,6 @@ void MaquinaEstados::processarObstaculo(
 
 // ============================================================
 // CONFIRMAR PRETO DURANTE OBSTÁCULO
-// ============================================================
-//
-// Qualquer dos 8 sensores pode disparar.
-//
-// Exemplo:
-//
-// sensor 0 preto
-// sensor 0 preto
-// sensor 0 preto
-//
-// ou:
-//
-// sensor 3 preto
-// sensor 3 preto
-// sensor 3 preto
-//
-// ou até sensores diferentes:
-//
-// sensor 2 preto
-// sensor 4 preto
-// sensor 5 preto
-//
-// O que importa é existir pelo menos um sensor preto
-// em cada atualização consecutiva.
-//
 // ============================================================
 
 bool MaquinaEstados::linhaPretaConfirmada(
@@ -1130,10 +1181,6 @@ bool MaquinaEstados::linhaPretaConfirmada(
     }
     else
     {
-        // ----------------------------------------------------
-        // Se perdeu o preto, a sequência consecutiva quebra.
-        // ----------------------------------------------------
-
         leiturasPretasObstaculo = 0;
     }
 

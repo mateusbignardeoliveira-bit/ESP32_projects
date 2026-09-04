@@ -29,32 +29,41 @@ class LinhaAnalise
 
 private:
 
+    // ============================================================
+    // CALIBRAÇÃO REALIZADA NO ROBÔ
+    // ============================================================
+
+    // Valores medidos com o array sobre o BRANCO
     const int branco[8] =
     {
-        213,
-        180,
-        177,
-        177,
-        181,
-        180,
-        184,
-        213
+        183,
+        164,
+        163,
+        164,
+        167,
+        166,
+        168,
+        178
     };
 
 
+    // Valores medidos com o array sobre o PRETO
     const int preto[8] =
     {
-        3394,
-        2820,
-        2979,
-        3031,
-        2992,
-        2763,
-        3019,
-        3349
+        3138,
+        2448,
+        2316,
+        2223,
+        2360,
+        2682,
+        2755,
+        2995
     };
 
 
+    // Posição física dos sensores
+    // Negativo = esquerda
+    // Positivo = direita
     const float pesos[8] =
     {
         -7.0f,
@@ -66,6 +75,26 @@ private:
          5.0f,
          7.0f
     };
+
+
+    // ============================================================
+    // SENSIBILIDADE DA DETECÇÃO
+    // ============================================================
+
+    // A linha preta real que medimos entre S4 e S5 produziu
+    // aproximadamente:
+    //
+    // S4 = 342 -> ~0.087 normalizado
+    // S5 = 318 -> ~0.069 normalizado
+    //
+    // Portanto 0.05 permite detectar essa linha com margem.
+    static constexpr float LIMIAR_DETECCAO = 0.05f;
+
+
+    // Sensor considerado ativo para cálculo da largura.
+    // Antes era 0.20f, o que era muito alto para a linha
+    // preta real encontrada nos testes.
+    static constexpr float LIMIAR_SENSOR_ATIVO = 0.05f;
 
 
     LinhaData resultado;

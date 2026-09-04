@@ -30,6 +30,12 @@ public:
 
         EXECUTANDO_GIRO,
 
+        // ----------------------------------------------------
+        // Curva preta
+        // ----------------------------------------------------
+
+        CURVA_PRETA,
+
         BUSCANDO_LINHA,
 
         // ----------------------------------------------------
@@ -222,6 +228,17 @@ private:
 
 
     void processarGiro(
+        const LinhaData& linha
+    );
+
+
+    // --------------------------------------------------------
+    // Curva preta
+    // --------------------------------------------------------
+
+    void iniciarCurvaPreta();
+
+    void processarCurvaPreta(
         const LinhaData& linha
     );
 
