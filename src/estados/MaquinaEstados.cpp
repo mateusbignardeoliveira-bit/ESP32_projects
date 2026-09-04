@@ -350,17 +350,6 @@ void MaquinaEstados::update(
 
 
         // ====================================================
-        // STOP CINZA
-        // ====================================================
-
-        case STOP_CINZA:
-
-            motores.stop();
-
-            break;
-
-
-        // ====================================================
         // STOP VERMELHO
         // ====================================================
 
@@ -529,19 +518,6 @@ void MaquinaEstados::finalizarAvaliacao(
         return;
     }
 
-
-    // ========================================================
-    // CINZA
-    // ========================================================
-
-    if(
-        analiseVerde.detectouCinza()
-    )
-    {
-        pararPorCinza();
-
-        return;
-    }
 
 
     // ========================================================
@@ -740,10 +716,10 @@ void MaquinaEstados::iniciarCurvaPreta()
     )
     {
         motores.setSpeed(
-            VELOCIDADE_CURVA_PRETA,
-            VELOCIDADE_CURVA_PRETA,
             -VELOCIDADE_CURVA_PRETA,
-            -VELOCIDADE_CURVA_PRETA
+            -VELOCIDADE_CURVA_PRETA,
+            VELOCIDADE_CURVA_PRETA,
+            VELOCIDADE_CURVA_PRETA
         );
 
         entrarEstado(
@@ -763,10 +739,10 @@ void MaquinaEstados::iniciarCurvaPreta()
     )
     {
         motores.setSpeed(
-            -VELOCIDADE_CURVA_PRETA,
-            -VELOCIDADE_CURVA_PRETA,
             VELOCIDADE_CURVA_PRETA,
-            VELOCIDADE_CURVA_PRETA
+            VELOCIDADE_CURVA_PRETA,
+            -VELOCIDADE_CURVA_PRETA,
+            -VELOCIDADE_CURVA_PRETA
         );
 
         entrarEstado(

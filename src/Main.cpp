@@ -88,8 +88,6 @@ static constexpr int LADO_OBSTACULO = 1;
 
 static constexpr int LEITURAS_VERMELHO_NECESSARIAS = 10;
 
-static constexpr int LEITURAS_CINZA_NECESSARIAS = 10;
-
 
 // ============================================================
 // OBJETOS
@@ -324,30 +322,7 @@ void atualizarConfirmacaoCores()
     }
 
 
-    // ========================================================
-    // CINZA
-    // ========================================================
-
-    if(
-        resultadoCorEsquerda.cinzaDetectado ||
-        resultadoCorDireita.cinzaDetectado
-    )
-    {
-        contadorCinza++;
-
-        if(
-            contadorCinza >
-            LEITURAS_CINZA_NECESSARIAS
-        )
-        {
-            contadorCinza =
-                LEITURAS_CINZA_NECESSARIAS;
-        }
-    }
-    else
-    {
-        contadorCinza = 0;
-    }
+    
 }
 
 
@@ -863,30 +838,6 @@ void loop()
             false;
     }
 
-
-    // ========================================================
-    // CINZA CONFIRMADO
-    // ========================================================
-    //
-    // Cinza precisa aparecer em 5 leituras consecutivas.
-    //
-    // Diferentemente do vermelho, cinza NÃO é uma trava
-    // absoluta.
-    //
-    // O interruptor acima consegue reiniciar a execução.
-    //
-
-    if(
-        contadorCinza >=
-        LEITURAS_CINZA_NECESSARIAS
-    )
-    {
-        maquinaEstados.pararPorCinza();
-
-        atualizarLEDs();
-
-        return;
-    }
 
 
     // ========================================================
