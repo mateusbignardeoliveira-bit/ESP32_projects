@@ -22,8 +22,6 @@
 
 static const float LIMIAR_MIN_VERDE_CLEAR = 12.0f;
 static const float LIMIAR_MIN_VERMELHO_CLEAR = 15.0f;
-static const float LIMIAR_MIN_CINZA_CLEAR = 32.0f;
-
 
 // ============================================================
 // LIMIARES DE VERDE
@@ -73,45 +71,6 @@ static const float LIMIAR_VERDE_F4_F6_MIN = 1.10f;
 static const float LIMIAR_VERMELHO_R_G_MIN = 3.0f;
 static const float LIMIAR_VERMELHO_R_B_MIN = 3.0f;
 static const float LIMIAR_VERMELHO_R_CLEAR_MIN = 0.56f;
-
-
-// ============================================================
-// LIMIARES DE CINZA
-// ============================================================
-//
-// Cinza:
-//
-// R/Clear ≈ 0.40 ~ 0.49
-// G/B     ≈ 0.96 ~ 1.06
-// Clear   = 36
-//
-// Branco:
-//
-// R/Clear ≈ 0.88 ~ 0.93
-// G/B     ≈ 1.25 ~ 1.30
-// Clear   = 36
-//
-// Preto:
-//
-// R/Clear ≈ 0.22 ~ 0.35
-// Clear   = 9 ~ 10
-//
-// O cinza, portanto, é identificado por:
-// - intensidade alta
-// - vermelho representando uma parcela intermediária
-//   do Clear
-// - verde e azul relativamente próximos
-//
-// Não usamos mais a antiga variação RGB de 25%, pois ela
-// não corresponde às leituras reais do material.
-// ============================================================
-
-static const float LIMIAR_CINZA_R_CLEAR_MIN = 0.38f;
-static const float LIMIAR_CINZA_R_CLEAR_MAX = 0.52f;
-
-static const float LIMIAR_CINZA_G_B_MIN = 0.90f;
-static const float LIMIAR_CINZA_G_B_MAX = 1.10f;
-
 
 // ============================================================
 // CONSTRUTOR
@@ -477,154 +436,6 @@ bool AS7341Analise::detectarVermelho(
 
 
 // ============================================================
-// DETECTAR CINZA
-// ============================================================
-//
-// O antigo algoritmo procurava RGB quase iguais.
-//
-// Isso não funciona para este sensor:
-//
-// CINZA REAL:
-// Azul  ≈ 8.5 ~ 11.5
-// Verde ≈ 9.0 ~ 11.0
-// Vermelho ≈ 14.5 ~ 17.5
-//
-// Portanto usamos uma assinatura relativa:
-//
-// - Clear alto
-// - R/Clear intermediário
-// - G/B próximo de 1
-//
-// Isso separa:
-//
-// CINZA:
-// R/C ≈ 0.40 ~ 0.49
-// G/B ≈ 0.96 ~ 1.06
-//
-// BRANCO:
-// R/C ≈ 0.88 ~ 0.93
-// G/B ≈ 1.25 ~ 1.30
-//
-// PRETO:
-// Clear ≈ 9 ~ 10
-// ============================================================
-
-bool AS7341Analise::detectarCinza(
-    const AS7341Data& dados
-)
-{
-    if(!dados.valido)
-        return false;
-
-    const float azul =
-        calcularAzul(dados);
-
-    const float verde =
-        calcularVerde(dados);
-
-    const float vermelho =
-        calcularVermelho(dados);
-
-    const float clear =
-        calcularIntensidade(dados);
-
-
-    // --------------------------------------------------------
-    // Intensidade precisa estar na região clara.
-    //
-    // Preto fica automaticamente excluído.
-    // --------------------------------------------------------
-
-    if(
-        clear < LIMIAR_MIN_CINZA_CLEAR
-    )
-    {
-        return false;
-    }
-
-
-    if(
-        azul <= 0.0f ||
-        verde <= 0.0f ||
-        vermelho <= 0.0f
-    )
-    {
-        return false;
-    }
-
-
-    // --------------------------------------------------------
-    // Participação do vermelho no Clear.
-    // --------------------------------------------------------
-
-    const float razaoRClear =
-        vermelho / clear;
-
-
-    // --------------------------------------------------------
-    // Relação verde / azul.
-    // --------------------------------------------------------
-
-    const float razaoGB =
-        verde / azul;
-
-
-    // --------------------------------------------------------
-    // O cinza precisa ficar na faixa intermediária de
-    // vermelho relativo ao Clear.
-    // --------------------------------------------------------
-
-    if(
-        razaoRClear < LIMIAR_CINZA_R_CLEAR_MIN ||
-        razaoRClear > LIMIAR_CINZA_R_CLEAR_MAX
-    )
-    {
-        return false;
-    }
-
-
-    // --------------------------------------------------------
-    // Verde e azul precisam ser relativamente próximos.
-    // --------------------------------------------------------
-
-    if(
-        razaoGB < LIMIAR_CINZA_G_B_MIN ||
-        razaoGB > LIMIAR_CINZA_G_B_MAX
-    )
-    {
-        return false;
-    }
-
-
-    // --------------------------------------------------------
-    // Verde tem prioridade.
-    // --------------------------------------------------------
-
-    if(
-        detectarVerde(dados)
-    )
-    {
-        return false;
-    }
-
-
-    // --------------------------------------------------------
-    // Vermelho tem prioridade.
-    // --------------------------------------------------------
-
-    if(
-        detectarVermelho(dados)
-    )
-    {
-        return false;
-    }
-
-
-    return true;
-}
-
-
-// ============================================================
 // ANALISAR
 // ============================================================
 
@@ -655,8 +466,6 @@ AS7341Resultado AS7341Analise::analisar(
     resultado.verdeDetectado = false;
 
     resultado.vermelhoDetectado = false;
-
-    resultado.cinzaDetectado = false;
 
 
     // --------------------------------------------------------
@@ -747,9 +556,6 @@ AS7341Resultado AS7341Analise::analisar(
 
     resultado.vermelhoDetectado =
         detectarVermelho(dados);
-
-    resultado.cinzaDetectado =
-        detectarCinza(dados);
 
 
     return resultado;

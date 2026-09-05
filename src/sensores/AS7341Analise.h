@@ -36,7 +36,6 @@ struct AS7341Resultado
     // Detecção de cores
     bool verdeDetectado;
     bool vermelhoDetectado;
-    bool cinzaDetectado;
 };
 
 
@@ -109,10 +108,6 @@ private:
     );
 
     bool detectarVermelho(
-        const AS7341Data& dados
-    );
-
-    bool detectarCinza(
         const AS7341Data& dados
     );
 };

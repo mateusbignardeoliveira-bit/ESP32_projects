@@ -235,9 +235,6 @@ bool roboParadoPorInterruptor = false;
 
 int contadorVermelho = 0;
 
-int contadorCinza = 0;
-
-
 // ============================================================
 // PARADA
 // ============================================================
@@ -267,8 +264,6 @@ void pararRobo()
 void resetConfirmacaoCores()
 {
     contadorVermelho = 0;
-
-    contadorCinza = 0;
 }
 
 
@@ -380,20 +375,6 @@ void atualizarLEDs()
 
 
     // --------------------------------------------------------
-    // CINZA TRAVADO
-    // --------------------------------------------------------
-
-    if(
-        maquinaEstados.paradoPorCinza()
-    )
-    {
-        leds.mostrarCinza();
-
-        return;
-    }
-
-
-    // --------------------------------------------------------
     // VERMELHO
     // --------------------------------------------------------
 
@@ -403,21 +384,6 @@ void atualizarLEDs()
     )
     {
         leds.mostrarVermelho();
-
-        return;
-    }
-
-
-    // --------------------------------------------------------
-    // CINZA
-    // --------------------------------------------------------
-
-    if(
-        resultadoCorEsquerda.cinzaDetectado ||
-        resultadoCorDireita.cinzaDetectado
-    )
-    {
-        leds.mostrarCinza();
 
         return;
     }

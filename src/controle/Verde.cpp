@@ -185,36 +185,6 @@ void Verde::update(
 
 
     // ========================================================
-    // CINZA ESQUERDO
-    // ========================================================
-
-    if(
-        esquerda.valido &&
-        esquerda.cinzaDetectado
-    )
-    {
-        resultado.cinzaEsquerda = true;
-
-        resultado.encontrouCinza = true;
-    }
-
-
-    // ========================================================
-    // CINZA DIREITO
-    // ========================================================
-
-    if(
-        direita.valido &&
-        direita.cinzaDetectado
-    )
-    {
-        resultado.cinzaDireita = true;
-
-        resultado.encontrouCinza = true;
-    }
-
-
-    // ========================================================
     // MAIOR QUANTIDADE DE PRETOS
     // ========================================================
 
