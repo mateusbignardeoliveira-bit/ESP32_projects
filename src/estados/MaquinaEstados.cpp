@@ -39,6 +39,28 @@ static constexpr unsigned long TIMEOUT_CORRECAO_CURVA_VERDE_MS = 800;
 
 
 // ============================================================
+// CONFIGURAÇÃO DA CURVA VERDE 180°
+// ============================================================
+//
+// Sequência:
+//
+// 1. Dois verdes detectados
+// 2. Giro controlado pela IMU até 120°
+// 3. Abandona o alvo angular
+// 4. Continua girando na mesma direção
+// 5. Espera sensor físico 3, 4, 5 ou 6 detectar preto
+// 6. Se sensor 4 ou 5 estiver preto:
+//        termina
+// 7. Caso contrário:
+//        faz pequena correção
+// 8. Termina quando sensor 4 ou 5 estiver preto
+//
+// ============================================================
+
+static constexpr float ANGULO_INICIAL_CURVA_180 = 120.0f;
+
+
+// ============================================================
 // CONFIGURAÇÃO DA MANOBRA DE OBSTÁCULO
 // ============================================================
 
@@ -620,7 +642,12 @@ void MaquinaEstados::finalizarAvaliacao(
     // --------------------------------------------------------
     // Verde dos dois lados = 180°
     //
-    // Mantemos o giro normal de 180°.
+    // Nova estratégia:
+    //
+    // 1. Giro controlado pela IMU até 120°
+    // 2. Giro contínuo na mesma direção
+    // 3. Array encontra a linha
+    //
     // --------------------------------------------------------
 
     if(
@@ -735,7 +762,20 @@ void MaquinaEstados::iniciarGiro(
 
         case GIRO_180:
 
-            controleGiro.curva180();
+            // ------------------------------------------------
+            // Para 180°:
+            //
+            // Não vamos mais controlar os 180° completos
+            // pelo giroscópio.
+            //
+            // Primeiro fazemos apenas 120°.
+            // Depois processarGiro() passa para o giro
+            // contínuo na mesma direção.
+            // ------------------------------------------------
+
+            controleGiro.girar(
+                ANGULO_INICIAL_CURVA_180
+            );
 
             break;
 
@@ -778,6 +818,65 @@ void MaquinaEstados::processarGiro(
         return;
     }
 
+
+    // --------------------------------------------------------
+    // Caso especial:
+    //
+    // GIRO_180 não termina realmente nos 120°.
+    //
+    // Os 120° são somente a primeira etapa.
+    // Depois continuamos girando até o array encontrar
+    // a linha.
+    // --------------------------------------------------------
+
+    if(
+        acaoGiro ==
+        GIRO_180
+    )
+    {
+        Serial.println(
+            "CURVA 180 | 120 CONCLUIDOS"
+        );
+
+        Serial.println(
+            "CURVA 180 | GIRO CONTINUO"
+        );
+
+
+        // ----------------------------------------------------
+        // O giro180 atual usa heading positivo.
+        // Portanto mantemos a mesma direção física:
+        // DIREITA.
+        // ----------------------------------------------------
+
+        direcaoCurvaVerde =
+            GIRO_DIREITA;
+
+
+        controleGiro.giroContinuoDireita(
+            VELOCIDADE_GIRO_VERDE_CONTINUO
+        );
+
+
+        inicioCurvaVerde =
+            millis();
+
+
+        acaoGiro =
+            NENHUM_GIRO;
+
+
+        entrarEstado(
+            CURVA_VERDE_CONTINUA
+        );
+
+        return;
+    }
+
+
+    // --------------------------------------------------------
+    // Giro normal de 90° ou outro giro convencional.
+    // --------------------------------------------------------
 
     acaoGiro =
         NENHUM_GIRO;
@@ -1352,8 +1451,7 @@ void MaquinaEstados::iniciarCurvaPreta()
 
 
     // --------------------------------------------------------
-    // NOVO:
-    // primeiro avança para frente.
+    // Primeiro avança para frente.
     // --------------------------------------------------------
 
     Serial.println(
