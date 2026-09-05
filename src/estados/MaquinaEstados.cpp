@@ -1282,27 +1282,6 @@ void MaquinaEstados::entrarEstado(
 
 
 // ============================================================
-// PARAR POR CINZA
-// ============================================================
-
-void MaquinaEstados::pararPorCinza()
-{
-    controleLinha.stop();
-
-    controleGiro.cancelar();
-
-    controleObstaculo.parar();
-
-    motores.stop();
-
-
-    entrarEstado(
-        STOP_CINZA
-    );
-}
-
-
-// ============================================================
 // PARAR POR VERMELHO
 // ============================================================
 
@@ -1345,7 +1324,6 @@ MaquinaEstados::getEstado() const
 bool MaquinaEstados::parado() const
 {
     return (
-        estado == STOP_CINZA ||
         estado == STOP_VERMELHO
     );
 }
@@ -1360,18 +1338,5 @@ bool MaquinaEstados::paradoPorVermelho() const
     return (
         estado ==
         STOP_VERMELHO
-    );
-}
-
-
-// ============================================================
-// PARADO POR CINZA
-// ============================================================
-
-bool MaquinaEstados::paradoPorCinza() const
-{
-    return (
-        estado ==
-        STOP_CINZA
     );
 }

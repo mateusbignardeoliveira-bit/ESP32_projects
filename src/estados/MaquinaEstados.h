@@ -51,8 +51,6 @@ public:
 
         OBSTACULO_GIRO_FINAL,
 
-        STOP_CINZA,
-
         STOP_VERMELHO
     };
 
@@ -103,21 +101,12 @@ public:
 
     bool paradoPorVermelho() const;
 
-    bool paradoPorCinza() const;
-
 
     // --------------------------------------------------------
     // Vermelho
     // --------------------------------------------------------
 
     void pararPorVermelho();
-
-
-    // --------------------------------------------------------
-    // Cinza
-    // --------------------------------------------------------
-
-    void pararPorCinza();
 
 
 private:
