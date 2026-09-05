@@ -1,4 +1,4 @@
- #include "MaquinaEstados.h"
+#include "MaquinaEstados.h"
 
 
 // ============================================================
@@ -13,27 +13,33 @@ static constexpr int PAUSA_APOS_RE_MS = 30;
 
 
 // ============================================================
-// CONFIGURAÇÃO DA MANOBRA DE OBSTÁCULO
+// CONFIGURAÇÃO DA CURVA VERDE
 // ============================================================
 //
-// Entrada:
+// Sequência:
 //
-// 1. Ré
-// 2. 90° direita
-// 3. Reto 500 ms
-// 4. 90° esquerda
+// 1. Giro controlado até 45°
+// 2. Giro contínuo na mesma direção
+// 3. Espera sensor físico 3, 4, 5 ou 6 detectar preto
+// 4. Se sensor 4 ou 5 já estiver preto:
+//        termina
+// 5. Caso contrário:
+//        faz pequena correção
+// 6. Termina quando sensor 4 ou 5 estiver preto
 //
-// Depois:
-//
-// Reto 1500 ms
-// 90° esquerda
-// Reto 1500 ms
-// 90° esquerda
-// ...
-//
-// Durante os RETOS o array procura preto.
-// Durante os GIROS o array não é considerado.
-//
+// ============================================================
+
+static constexpr int VELOCIDADE_GIRO_VERDE_CONTINUO = 100;
+
+static constexpr int VELOCIDADE_CORRECAO_CURVA_VERDE = 100;
+
+static constexpr unsigned long TIMEOUT_CURVA_VERDE_MS = 3000;
+
+static constexpr unsigned long TIMEOUT_CORRECAO_CURVA_VERDE_MS = 800;
+
+
+// ============================================================
+// CONFIGURAÇÃO DA MANOBRA DE OBSTÁCULO
 // ============================================================
 
 static constexpr int VELOCIDADE_RE_OBSTACULO = -180;
@@ -59,27 +65,24 @@ static constexpr float LIMIAR_PRETO_OBSTACULO = 0.35f;
 // ============================================================
 // CONFIGURAÇÃO DA CURVA PRETA
 // ============================================================
-//
-// A curva preta NÃO usa o giroscópio.
-//
-// O robô gira de acordo com a tendência anterior:
-//
-// tendência < 0 -> direita
-// tendência > 0 -> esquerda
-//
-// O giro termina quando o sensor físico 4 ou 5
-// volta a detectar preto.
-//
-// LinhaData usa índice começando em 0:
-//
-// sensor físico 4 -> sensores[3]
-// sensor físico 5 -> sensores[4]
-//
-// ============================================================
 
 static constexpr float LIMIAR_PRETO_CURVA = 0.35f;
 
 static constexpr int VELOCIDADE_CURVA_PRETA = 100;
+
+
+// ------------------------------------------------------------
+// Avanço antes da curva preta
+// ------------------------------------------------------------
+//
+// Aumente TEMPO_AVANCO_CURVA_PRETA_MS se quiser que o robô
+// avance mais antes de começar a girar.
+//
+// ============================================================
+
+static constexpr int VELOCIDADE_AVANCO_CURVA_PRETA = 100;
+
+static constexpr unsigned long TEMPO_AVANCO_CURVA_PRETA_MS = 50;
 
 
 // ============================================================
@@ -119,7 +122,7 @@ MaquinaEstados::MaquinaEstados(
 
     inicioAvaliacao = 0;
 
-    tempoMinimoAvaliacao = 150;
+    tempoMinimoAvaliacao = 400;
 
     tempoMaximoAvaliacao = 1000;
 
@@ -127,6 +130,18 @@ MaquinaEstados::MaquinaEstados(
     inicioBusca = 0;
 
     tempoMaximoBusca = 2000;
+
+
+    direcaoCurvaVerde = NENHUM_GIRO;
+
+    inicioCurvaVerde = 0;
+
+    inicioCorrecaoCurvaVerde = 0;
+
+
+    direcaoCurvaPreta = NENHUM_GIRO;
+
+    inicioAvancoCurvaPreta = 0;
 
 
     inicioTrechoObstaculo = 0;
@@ -175,9 +190,23 @@ void MaquinaEstados::begin()
 
     tendenciaAntes = 0.0f;
 
+
     inicioAvaliacao = 0;
 
     inicioBusca = 0;
+
+
+    direcaoCurvaVerde = NENHUM_GIRO;
+
+    inicioCurvaVerde = 0;
+
+    inicioCorrecaoCurvaVerde = 0;
+
+
+    direcaoCurvaPreta = NENHUM_GIRO;
+
+    inicioAvancoCurvaPreta = 0;
+
 
     inicioTrechoObstaculo = 0;
 
@@ -206,9 +235,23 @@ void MaquinaEstados::resetExecucao()
 
     tendenciaAntes = 0.0f;
 
+
     inicioAvaliacao = 0;
 
     inicioBusca = 0;
+
+
+    direcaoCurvaVerde = NENHUM_GIRO;
+
+    inicioCurvaVerde = 0;
+
+    inicioCorrecaoCurvaVerde = 0;
+
+
+    direcaoCurvaPreta = NENHUM_GIRO;
+
+    inicioAvancoCurvaPreta = 0;
+
 
     inicioTrechoObstaculo = 0;
 
@@ -298,6 +341,50 @@ void MaquinaEstados::update(
 
 
         // ====================================================
+        // GIRO VERDE DE 45°
+        // ====================================================
+
+        case GIRO_VERDE_45:
+
+            processarGiroVerde45(linha);
+
+            break;
+
+
+        // ====================================================
+        // CURVA VERDE CONTÍNUA
+        // ====================================================
+
+        case CURVA_VERDE_CONTINUA:
+
+            processarCurvaVerdeContinua(linha);
+
+            break;
+
+
+        // ====================================================
+        // CORREÇÃO FINAL DA CURVA VERDE
+        // ====================================================
+
+        case CORRECAO_CURVA_VERDE:
+
+            processarCorrecaoCurvaVerde(linha);
+
+            break;
+
+
+        // ====================================================
+        // AVANÇO ANTES DA CURVA PRETA
+        // ====================================================
+
+        case AVANCO_CURVA_PRETA:
+
+            processarAvancoCurvaPreta();
+
+            break;
+
+
+        // ====================================================
         // CURVA PRETA
         // ====================================================
 
@@ -309,7 +396,7 @@ void MaquinaEstados::update(
 
 
         // ====================================================
-        // BUSCANDO LINHA NORMAL
+        // BUSCANDO LINHA
         // ====================================================
 
         case BUSCANDO_LINHA:
@@ -519,7 +606,6 @@ void MaquinaEstados::finalizarAvaliacao(
     }
 
 
-
     // ========================================================
     // VERDE
     // ========================================================
@@ -533,6 +619,8 @@ void MaquinaEstados::finalizarAvaliacao(
 
     // --------------------------------------------------------
     // Verde dos dois lados = 180°
+    //
+    // Mantemos o giro normal de 180°.
     // --------------------------------------------------------
 
     if(
@@ -549,14 +637,17 @@ void MaquinaEstados::finalizarAvaliacao(
 
 
     // --------------------------------------------------------
-    // Verde esquerda = 90°
+    // Verde esquerda
+    //
+    // Nova estratégia:
+    // 45° controlados + giro contínuo.
     // --------------------------------------------------------
 
     if(esquerda)
     {
         reAntesDaCurva();
 
-        iniciarGiro(
+        iniciarGiroVerde(
             GIRO_ESQUERDA
         );
 
@@ -565,14 +656,17 @@ void MaquinaEstados::finalizarAvaliacao(
 
 
     // --------------------------------------------------------
-    // Verde direita = 90°
+    // Verde direita
+    //
+    // Nova estratégia:
+    // 45° controlados + giro contínuo.
     // --------------------------------------------------------
 
     if(direita)
     {
         reAntesDaCurva();
 
-        iniciarGiro(
+        iniciarGiroVerde(
             GIRO_DIREITA
         );
 
@@ -617,6 +711,7 @@ void MaquinaEstados::iniciarGiro(
     controleLinha.stop();
 
     motores.stop();
+
 
     acaoGiro = acao;
 
@@ -671,6 +766,8 @@ void MaquinaEstados::processarGiro(
     const LinhaData& linha
 )
 {
+    (void)linha;
+
     controleGiro.update();
 
 
@@ -695,7 +792,512 @@ void MaquinaEstados::processarGiro(
 
 
 // ============================================================
+// INICIAR GIRO VERDE
+// ============================================================
+//
+// Primeiro estágio:
+// giro preciso de 45° usando IMU.
+//
+// Depois o estado GIRO_VERDE_45 detecta o término e passa
+// automaticamente para o giro contínuo.
+// ============================================================
+
+void MaquinaEstados::iniciarGiroVerde(
+    AcaoGiro acao
+)
+{
+    controleLinha.stop();
+
+    controleGiro.cancelar();
+
+    motores.stop();
+
+
+    direcaoCurvaVerde =
+        acao;
+
+
+    inicioCurvaVerde =
+        millis();
+
+
+    switch(acao)
+    {
+
+        case GIRO_ESQUERDA:
+
+            Serial.println(
+                "CURVA VERDE ESQUERDA | INICIO 45"
+            );
+
+            controleGiro.curva45Esquerda();
+
+            break;
+
+
+        case GIRO_DIREITA:
+
+            Serial.println(
+                "CURVA VERDE DIREITA | INICIO 45"
+            );
+
+            controleGiro.curva45Direita();
+
+            break;
+
+
+        default:
+
+            controleLinha.start();
+
+            entrarEstado(
+                SEGUINDO_LINHA
+            );
+
+            return;
+    }
+
+
+    entrarEstado(
+        GIRO_VERDE_45
+    );
+}
+
+
+// ============================================================
+// PROCESSAR GIRO VERDE 45°
+// ============================================================
+
+void MaquinaEstados::processarGiroVerde45(
+    const LinhaData& linha
+)
+{
+    (void)linha;
+
+    controleGiro.update();
+
+
+    // --------------------------------------------------------
+    // Ainda não chegou nos 45°.
+    // --------------------------------------------------------
+
+    if(
+        !controleGiro.terminou()
+    )
+    {
+        return;
+    }
+
+
+    // --------------------------------------------------------
+    // 45° concluídos.
+    //
+    // Agora abandonamos completamente o alvo angular.
+    // --------------------------------------------------------
+
+    Serial.println(
+        "CURVA VERDE | 45 CONCLUIDOS"
+    );
+
+    Serial.println(
+        "CURVA VERDE | GIRO CONTINUO"
+    );
+
+
+    if(
+        direcaoCurvaVerde ==
+        GIRO_ESQUERDA
+    )
+    {
+        controleGiro.giroContinuoEsquerda(
+            VELOCIDADE_GIRO_VERDE_CONTINUO
+        );
+    }
+    else
+    {
+        controleGiro.giroContinuoDireita(
+            VELOCIDADE_GIRO_VERDE_CONTINUO
+        );
+    }
+
+
+    inicioCurvaVerde =
+        millis();
+
+
+    entrarEstado(
+        CURVA_VERDE_CONTINUA
+    );
+}
+
+
+// ============================================================
+// PROCESSAR CURVA VERDE CONTÍNUA
+// ============================================================
+//
+// Durante essa fase:
+//
+// NÃO usamos alvo angular.
+//
+// NÃO usamos o heading para determinar quando parar.
+//
+// O robô simplesmente continua girando no mesmo sentido.
+//
+// A parada acontece quando qualquer um dos sensores físicos
+// 3, 4, 5 ou 6 detectar preto.
+// ============================================================
+
+void MaquinaEstados::processarCurvaVerdeContinua(
+    const LinhaData& linha
+)
+{
+    // --------------------------------------------------------
+    // Segurança contra giro infinito.
+    // --------------------------------------------------------
+
+    if(
+        millis() - inicioCurvaVerde >=
+        TIMEOUT_CURVA_VERDE_MS
+    )
+    {
+        Serial.println(
+            "CURVA VERDE | TIMEOUT"
+        );
+
+        controleGiro.pararGiroContinuo();
+
+        controleLinha.start();
+
+        entrarEstado(
+            SEGUINDO_LINHA
+        );
+
+        return;
+    }
+
+
+    // --------------------------------------------------------
+    // Nenhum dos sensores centrais encontrou preto ainda.
+    // --------------------------------------------------------
+
+    if(
+        !sensorCentralEncontrouPreto(linha)
+    )
+    {
+        return;
+    }
+
+
+    // --------------------------------------------------------
+    // Encontramos a linha.
+    // --------------------------------------------------------
+
+    Serial.println(
+        "CURVA VERDE | PRETO ENCONTRADO"
+    );
+
+
+    // --------------------------------------------------------
+    // Se sensor físico 4 ou 5 já está na linha,
+    // não precisamos corrigir.
+    // --------------------------------------------------------
+
+    if(
+        sensorCentroNaLinha(linha)
+    )
+    {
+        Serial.println(
+            "CURVA VERDE | SENSOR 4/5 CENTRALIZADO"
+        );
+
+        controleGiro.pararGiroContinuo();
+
+        controleLinha.start();
+
+        entrarEstado(
+            SEGUINDO_LINHA
+        );
+
+        return;
+    }
+
+
+    // --------------------------------------------------------
+    // Preto apareceu no sensor 3 ou 6.
+    //
+    // Fazemos a pequena correção final.
+    // --------------------------------------------------------
+
+    iniciarCorrecaoCurvaVerde(linha);
+}
+
+
+// ============================================================
+// INICIAR CORREÇÃO DA CURVA VERDE
+// ============================================================
+
+void MaquinaEstados::iniciarCorrecaoCurvaVerde(
+    const LinhaData& linha
+)
+{
+    AcaoGiro correcao =
+        determinarDirecaoCorrecao(linha);
+
+
+    if(
+        correcao ==
+        NENHUM_GIRO
+    )
+    {
+        // Situação ambígua.
+        // Por segurança, retoma o PID.
+
+        controleGiro.pararGiroContinuo();
+
+        controleLinha.start();
+
+        entrarEstado(
+            SEGUINDO_LINHA
+        );
+
+        return;
+    }
+
+
+    // --------------------------------------------------------
+    // Primeiro para o giro contínuo.
+    // --------------------------------------------------------
+
+    controleGiro.pararGiroContinuo();
+
+
+    direcaoCurvaVerde =
+        correcao;
+
+
+    inicioCorrecaoCurvaVerde =
+        millis();
+
+
+    // --------------------------------------------------------
+    // Começa correção lenta.
+    // --------------------------------------------------------
+
+    if(
+        correcao ==
+        GIRO_ESQUERDA
+    )
+    {
+        Serial.println(
+            "CURVA VERDE | CORRECAO ESQUERDA"
+        );
+
+        controleGiro.giroContinuoEsquerda(
+            VELOCIDADE_CORRECAO_CURVA_VERDE
+        );
+    }
+    else
+    {
+        Serial.println(
+            "CURVA VERDE | CORRECAO DIREITA"
+        );
+
+        controleGiro.giroContinuoDireita(
+            VELOCIDADE_CORRECAO_CURVA_VERDE
+        );
+    }
+
+
+    entrarEstado(
+        CORRECAO_CURVA_VERDE
+    );
+}
+
+
+// ============================================================
+// PROCESSAR CORREÇÃO DA CURVA VERDE
+// ============================================================
+
+void MaquinaEstados::processarCorrecaoCurvaVerde(
+    const LinhaData& linha
+)
+{
+    // --------------------------------------------------------
+    // Objetivo da correção:
+    //
+    // sensor físico 4 OU sensor físico 5 preto.
+    // --------------------------------------------------------
+
+    if(
+        sensorCentroNaLinha(linha)
+    )
+    {
+        Serial.println(
+            "CURVA VERDE | CORRECAO CONCLUIDA"
+        );
+
+
+        controleGiro.pararGiroContinuo();
+
+
+        controleLinha.start();
+
+        entrarEstado(
+            SEGUINDO_LINHA
+        );
+
+        return;
+    }
+
+
+    // --------------------------------------------------------
+    // Segurança.
+    // --------------------------------------------------------
+
+    if(
+        millis() - inicioCorrecaoCurvaVerde >=
+        TIMEOUT_CORRECAO_CURVA_VERDE_MS
+    )
+    {
+        Serial.println(
+            "CURVA VERDE | TIMEOUT CORRECAO"
+        );
+
+
+        controleGiro.pararGiroContinuo();
+
+
+        controleLinha.start();
+
+        entrarEstado(
+            SEGUINDO_LINHA
+        );
+
+        return;
+    }
+}
+
+
+// ============================================================
+// SENSOR CENTRAL ENCONTROU PRETO
+// ============================================================
+//
+// Sensores físicos:
+//
+// 3 -> sensores[2]
+// 4 -> sensores[3]
+// 5 -> sensores[4]
+// 6 -> sensores[5]
+// ============================================================
+
+bool MaquinaEstados::sensorCentralEncontrouPreto(
+    const LinhaData& linha
+)
+{
+    return
+        linha.sensores[2] >= LIMIAR_PRETO_CURVA ||
+        linha.sensores[3] >= LIMIAR_PRETO_CURVA ||
+        linha.sensores[4] >= LIMIAR_PRETO_CURVA ||
+        linha.sensores[5] >= LIMIAR_PRETO_CURVA;
+}
+
+
+// ============================================================
+// SENSOR 4 OU 5 NA LINHA
+// ============================================================
+
+bool MaquinaEstados::sensorCentroNaLinha(
+    const LinhaData& linha
+)
+{
+    return
+        linha.sensores[3] >= LIMIAR_PRETO_CURVA ||
+        linha.sensores[4] >= LIMIAR_PRETO_CURVA;
+}
+
+
+// ============================================================
+// DETERMINAR DIREÇÃO DA CORREÇÃO
+// ============================================================
+//
+// Se o sensor físico 3 detectou preto:
+//
+//     linha está para a esquerda
+//     -> pequena correção para esquerda
+//
+// Se o sensor físico 6 detectou preto:
+//
+//     linha está para a direita
+//     -> pequena correção para direita
+//
+// Se ambos estiverem ativos, usamos a posição calculada
+// pela LinhaAnalise como desempate.
+// ============================================================
+
+MaquinaEstados::AcaoGiro
+MaquinaEstados::determinarDirecaoCorrecao(
+    const LinhaData& linha
+)
+{
+    bool sensor3 =
+        linha.sensores[2] >=
+        LIMIAR_PRETO_CURVA;
+
+    bool sensor6 =
+        linha.sensores[5] >=
+        LIMIAR_PRETO_CURVA;
+
+
+    if(
+        sensor3 &&
+        !sensor6
+    )
+    {
+        return GIRO_ESQUERDA;
+    }
+
+
+    if(
+        sensor6 &&
+        !sensor3
+    )
+    {
+        return GIRO_DIREITA;
+    }
+
+
+    // --------------------------------------------------------
+    // Caso ambíguo:
+    // usa posição da linha.
+    //
+    // posição negativa = esquerda
+    // posição positiva = direita
+    // --------------------------------------------------------
+
+    if(linha.posicao < -0.5f)
+    {
+        return GIRO_ESQUERDA;
+    }
+
+
+    if(linha.posicao > 0.5f)
+    {
+        return GIRO_DIREITA;
+    }
+
+
+    return NENHUM_GIRO;
+}
+
+
+// ============================================================
 // INICIAR CURVA PRETA
+// ============================================================
+//
+// Agora há um avanço antes da rotação.
+//
+// A direção é determinada pela tendência registrada antes
+// da avaliação.
 // ============================================================
 
 void MaquinaEstados::iniciarCurvaPreta()
@@ -708,11 +1310,114 @@ void MaquinaEstados::iniciarCurvaPreta()
 
 
     // --------------------------------------------------------
-    // Tendência negativa = curva para a direita.
+    // Tendência negativa = curva para direita.
     // --------------------------------------------------------
 
     if(
         tendenciaAntes < 0.0f
+    )
+    {
+        direcaoCurvaPreta =
+            GIRO_DIREITA;
+    }
+
+
+    // --------------------------------------------------------
+    // Tendência positiva = curva para esquerda.
+    // --------------------------------------------------------
+
+    else if(
+        tendenciaAntes > 0.0f
+    )
+    {
+        direcaoCurvaPreta =
+            GIRO_ESQUERDA;
+    }
+
+
+    // --------------------------------------------------------
+    // Sem tendência confiável.
+    // --------------------------------------------------------
+
+    else
+    {
+        controleLinha.start();
+
+        entrarEstado(
+            SEGUINDO_LINHA
+        );
+
+        return;
+    }
+
+
+    // --------------------------------------------------------
+    // NOVO:
+    // primeiro avança para frente.
+    // --------------------------------------------------------
+
+    Serial.println(
+        "CURVA PRETA | AVANCO"
+    );
+
+
+    motores.setSpeed(
+        VELOCIDADE_AVANCO_CURVA_PRETA,
+        VELOCIDADE_AVANCO_CURVA_PRETA,
+        VELOCIDADE_AVANCO_CURVA_PRETA,
+        VELOCIDADE_AVANCO_CURVA_PRETA
+    );
+
+
+    inicioAvancoCurvaPreta =
+        millis();
+
+
+    entrarEstado(
+        AVANCO_CURVA_PRETA
+    );
+}
+
+
+// ============================================================
+// PROCESSAR AVANÇO DA CURVA PRETA
+// ============================================================
+
+void MaquinaEstados::processarAvancoCurvaPreta()
+{
+    if(
+        millis() -
+        inicioAvancoCurvaPreta <
+        TEMPO_AVANCO_CURVA_PRETA_MS
+    )
+    {
+        return;
+    }
+
+
+    motores.stop();
+
+
+    delay(30);
+
+
+    iniciarRotacaoCurvaPreta();
+}
+
+
+// ============================================================
+// INICIAR ROTAÇÃO DA CURVA PRETA
+// ============================================================
+
+void MaquinaEstados::iniciarRotacaoCurvaPreta()
+{
+    // --------------------------------------------------------
+    // Direita
+    // --------------------------------------------------------
+
+    if(
+        direcaoCurvaPreta ==
+        GIRO_DIREITA
     )
     {
         motores.setSpeed(
@@ -721,21 +1426,16 @@ void MaquinaEstados::iniciarCurvaPreta()
             VELOCIDADE_CURVA_PRETA,
             VELOCIDADE_CURVA_PRETA
         );
-
-        entrarEstado(
-            CURVA_PRETA
-        );
-
-        return;
     }
 
 
     // --------------------------------------------------------
-    // Tendência positiva = curva para a esquerda.
+    // Esquerda
     // --------------------------------------------------------
 
-    if(
-        tendenciaAntes > 0.0f
+    else if(
+        direcaoCurvaPreta ==
+        GIRO_ESQUERDA
     )
     {
         motores.setSpeed(
@@ -744,23 +1444,23 @@ void MaquinaEstados::iniciarCurvaPreta()
             -VELOCIDADE_CURVA_PRETA,
             -VELOCIDADE_CURVA_PRETA
         );
+    }
+
+
+    else
+    {
+        controleLinha.start();
 
         entrarEstado(
-            CURVA_PRETA
+            SEGUINDO_LINHA
         );
 
         return;
     }
 
 
-    // --------------------------------------------------------
-    // Sem tendência confiável.
-    // --------------------------------------------------------
-
-    controleLinha.start();
-
     entrarEstado(
-        SEGUINDO_LINHA
+        CURVA_PRETA
     );
 }
 
@@ -772,11 +1472,8 @@ void MaquinaEstados::iniciarCurvaPreta()
 // Durante a curva preta NÃO usamos o giroscópio.
 //
 // O robô continua girando até que:
-//
 // sensor físico 4 OU sensor físico 5
-//
 // detecte preto.
-//
 // ============================================================
 
 void MaquinaEstados::processarCurvaPreta(
@@ -793,22 +1490,26 @@ void MaquinaEstados::processarCurvaPreta(
         LIMIAR_PRETO_CURVA;
 
 
-    // --------------------------------------------------------
-    // Encontrou a linha.
-    // --------------------------------------------------------
-
     if(
         sensor4Preto ||
         sensor5Preto
     )
     {
+        Serial.println(
+            "CURVA PRETA | LINHA ENCONTRADA"
+        );
+
+
         motores.stop();
 
+
         controleLinha.start();
+
 
         entrarEstado(
             SEGUINDO_LINHA
         );
+
 
         return;
     }
@@ -831,7 +1532,7 @@ void MaquinaEstados::iniciarObstaculo()
 
 
     // --------------------------------------------------------
-    // Primeiro: ré para afastar do obstáculo.
+    // Primeiro: ré.
     // --------------------------------------------------------
 
     motores.setSpeed(
@@ -850,15 +1551,11 @@ void MaquinaEstados::iniciarObstaculo()
 
 
     // --------------------------------------------------------
-    // Primeiro giro: SEMPRE para a direita.
+    // Primeiro giro: direita.
     // --------------------------------------------------------
 
     controleGiro.curva90Direita();
 
-
-    // --------------------------------------------------------
-    // Durante esse giro não procuramos linha.
-    // --------------------------------------------------------
 
     entrarEstado(
         OBSTACULO_GIRO_1
@@ -878,10 +1575,6 @@ void MaquinaEstados::iniciarRetoObstaculo(
 
     controleObstaculo.parar();
 
-
-    // --------------------------------------------------------
-    // Nova reta = começa uma nova confirmação.
-    // --------------------------------------------------------
 
     leiturasPretasObstaculo = 0;
 
@@ -927,10 +1620,6 @@ void MaquinaEstados::processarObstaculo(
         // ====================================================
 
         case OBSTACULO_GIRO_1:
-
-            // ------------------------------------------------
-            // Não procuramos preto durante o giro.
-            // ------------------------------------------------
 
             controleGiro.update();
 
@@ -1181,7 +1870,7 @@ void MaquinaEstados::iniciarBuscaLinha()
 
 
 // ============================================================
-// LINHA ENCONTRADA - BUSCA NORMAL
+// LINHA ENCONTRADA
 // ============================================================
 
 bool MaquinaEstados::linhaEncontrada(
@@ -1324,7 +2013,8 @@ MaquinaEstados::getEstado() const
 bool MaquinaEstados::parado() const
 {
     return (
-        estado == STOP_VERMELHO
+        estado ==
+        STOP_VERMELHO
     );
 }
 

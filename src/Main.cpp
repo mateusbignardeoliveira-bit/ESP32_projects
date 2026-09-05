@@ -57,7 +57,7 @@ static constexpr uint8_t CANAL_TOF = 0;
 // VELOCIDADE
 // ============================================================
 
-static constexpr int VELOCIDADE_LINHA = 200;
+static constexpr int VELOCIDADE_LINHA = 150;
 
 
 // ============================================================
@@ -86,7 +86,7 @@ static constexpr int LADO_OBSTACULO = 1;
 // seja interpretado como uma marca real.
 //
 
-static constexpr int LEITURAS_VERMELHO_NECESSARIAS = 10;
+static constexpr int LEITURAS_VERMELHO_NECESSARIAS = 7;
 
 
 // ============================================================

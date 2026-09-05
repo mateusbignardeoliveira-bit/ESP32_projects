@@ -93,21 +93,29 @@ void ControleGiro::girar(float angulo)
     }
 
 
+    // --------------------------------------------------------
     // Atualiza IMU antes de capturar o heading inicial.
+    // --------------------------------------------------------
 
     sensorIMU.update();
 
     headingInicial = sensorIMU.getHeading();
 
 
+    // --------------------------------------------------------
     // Guarda comando.
+    // --------------------------------------------------------
 
     anguloSolicitado = angulo;
 
 
+    // --------------------------------------------------------
     // Calcula alvo.
+    // --------------------------------------------------------
 
-    headingAlvo = headingInicial + anguloSolicitado;
+    headingAlvo =
+        headingInicial +
+        anguloSolicitado;
 
     while(headingAlvo >= 360.0f)
         headingAlvo -= 360.0f;
@@ -116,7 +124,9 @@ void ControleGiro::girar(float angulo)
         headingAlvo += 360.0f;
 
 
+    // --------------------------------------------------------
     // Reseta controle.
+    // --------------------------------------------------------
 
     erroAnterior = 0.0f;
     integral = 0.0f;
@@ -126,13 +136,17 @@ void ControleGiro::girar(float angulo)
     ultimoTempo = millis();
 
 
+    // --------------------------------------------------------
     // Estado.
+    // --------------------------------------------------------
 
     movimentoConcluido = false;
     emExecucao = true;
 
 
+    // --------------------------------------------------------
     // Debug.
+    // --------------------------------------------------------
 
     Serial.print("Giro iniciado | Inicial: ");
     Serial.print(headingInicial, 2);
@@ -149,6 +163,7 @@ void ControleGiro::girar(float angulo)
 void ControleGiro::curva90Direita()
 {
     // Heading positivo = direita.
+
     girar(90.0f);
 }
 
@@ -160,6 +175,7 @@ void ControleGiro::curva90Direita()
 void ControleGiro::curva90Esquerda()
 {
     // Heading negativo = esquerda.
+
     girar(-90.0f);
 }
 
@@ -171,6 +187,26 @@ void ControleGiro::curva90Esquerda()
 void ControleGiro::curva180()
 {
     girar(180.0f);
+}
+
+
+// ============================================================
+// CURVA 45 DIREITA
+// ============================================================
+
+void ControleGiro::curva45Direita()
+{
+    girar(45.0f);
+}
+
+
+// ============================================================
+// CURVA 45 ESQUERDA
+// ============================================================
+
+void ControleGiro::curva45Esquerda()
+{
+    girar(-45.0f);
 }
 
 
@@ -192,17 +228,19 @@ void ControleGiro::update()
         return;
 
 
-    float headingAtual = sensorIMU.getHeading();
+    float headingAtual =
+        sensorIMU.getHeading();
 
 
     // --------------------------------------------------------
     // Calcula erro
     // --------------------------------------------------------
 
-    float erro = calcularErroAngular(
-        headingAtual,
-        headingAlvo
-    );
+    float erro =
+        calcularErroAngular(
+            headingAtual,
+            headingAlvo
+        );
 
 
     // --------------------------------------------------------
@@ -289,7 +327,8 @@ void ControleGiro::update()
     // MAGNITUDE
     // --------------------------------------------------------
 
-    float magnitude = fabsf(saida);
+    float magnitude =
+        fabsf(saida);
 
     if(magnitude > velocidadeMaxima)
         magnitude = velocidadeMaxima;
@@ -304,7 +343,8 @@ void ControleGiro::update()
     }
 
 
-    int velocidade = (int)magnitude;
+    int velocidade =
+        (int)magnitude;
 
 
     if(velocidade > velocidadeMaxima)
@@ -314,21 +354,11 @@ void ControleGiro::update()
     // --------------------------------------------------------
     // COMANDO DE GIRO
     //
-    // IMPORTANTE:
-    //
-    // O MotorControlador da montagem atual está com o sentido
-    // dos motores invertido para compensar a direção física.
-    //
-    // Portanto o diferencial abaixo também precisa ser
-    // invertido em relação ao sinal lógico do heading.
-    //
     // erro positivo:
-    //     heading precisa aumentar
-    //     -> giro físico para direita
+    //     giro físico para direita
     //
     // erro negativo:
-    //     heading precisa diminuir
-    //     -> giro físico para esquerda
+    //     giro físico para esquerda
     // --------------------------------------------------------
 
     if(erro > 0.0f)
@@ -353,6 +383,109 @@ void ControleGiro::update()
             -velocidade
         );
     }
+}
+
+
+// ============================================================
+// GIRO CONTÍNUO DIREITA
+// ============================================================
+
+void ControleGiro::giroContinuoDireita(
+    int velocidade
+)
+{
+    if(velocidade < 0)
+        velocidade = -velocidade;
+
+    if(velocidade > velocidadeMaxima)
+        velocidade = velocidadeMaxima;
+
+
+    movimentoConcluido = false;
+    emExecucao = true;
+
+
+    erroAnterior = 0.0f;
+    integral = 0.0f;
+
+
+    // --------------------------------------------------------
+    // DIREITA FÍSICA
+    // --------------------------------------------------------
+
+    motores.setSpeed(
+        -velocidade,
+        -velocidade,
+        velocidade,
+        velocidade
+    );
+
+
+    Serial.print("Giro continuo DIREITA | Velocidade: ");
+    Serial.println(velocidade);
+}
+
+
+// ============================================================
+// GIRO CONTÍNUO ESQUERDA
+// ============================================================
+
+void ControleGiro::giroContinuoEsquerda(
+    int velocidade
+)
+{
+    if(velocidade < 0)
+        velocidade = -velocidade;
+
+    if(velocidade > velocidadeMaxima)
+        velocidade = velocidadeMaxima;
+
+
+    movimentoConcluido = false;
+    emExecucao = true;
+
+
+    erroAnterior = 0.0f;
+    integral = 0.0f;
+
+
+    // --------------------------------------------------------
+    // ESQUERDA FÍSICA
+    // --------------------------------------------------------
+
+    motores.setSpeed(
+        velocidade,
+        velocidade,
+        -velocidade,
+        -velocidade
+    );
+
+
+    Serial.print("Giro continuo ESQUERDA | Velocidade: ");
+    Serial.println(velocidade);
+}
+
+
+// ============================================================
+// PARAR GIRO CONTÍNUO
+// ============================================================
+
+void ControleGiro::pararGiroContinuo()
+{
+    motores.stop();
+
+    delay(30);
+
+    motores.release();
+
+
+    emExecucao = false;
+    movimentoConcluido = false;
+
+    erroAnterior = 0.0f;
+    integral = 0.0f;
+
+    inicioEstabilizacao = 0;
 }
 
 

@@ -28,11 +28,27 @@ public:
 
         AVALIANDO_MARCA,
 
+        // ----------------------------------------------------
+        // Giro normal
+        // ----------------------------------------------------
+
         EXECUTANDO_GIRO,
+
+        // ----------------------------------------------------
+        // Curva verde
+        // ----------------------------------------------------
+
+        GIRO_VERDE_45,
+
+        CURVA_VERDE_CONTINUA,
+
+        CORRECAO_CURVA_VERDE,
 
         // ----------------------------------------------------
         // Curva preta
         // ----------------------------------------------------
+
+        AVANCO_CURVA_PRETA,
 
         CURVA_PRETA,
 
@@ -43,10 +59,13 @@ public:
         // ----------------------------------------------------
 
         OBSTACULO_GIRO_1,
+
         OBSTACULO_RETO_INICIAL,
+
         OBSTACULO_GIRO_2,
 
         OBSTACULO_ORBITA_RETO,
+
         OBSTACULO_ORBITA_GIRO,
 
         OBSTACULO_GIRO_FINAL,
@@ -166,6 +185,26 @@ private:
 
 
     // --------------------------------------------------------
+    // Curva verde
+    // --------------------------------------------------------
+
+    AcaoGiro direcaoCurvaVerde;
+
+    unsigned long inicioCurvaVerde;
+
+    unsigned long inicioCorrecaoCurvaVerde;
+
+
+    // --------------------------------------------------------
+    // Curva preta
+    // --------------------------------------------------------
+
+    AcaoGiro direcaoCurvaPreta;
+
+    unsigned long inicioAvancoCurvaPreta;
+
+
+    // --------------------------------------------------------
     // Obstáculo
     // --------------------------------------------------------
 
@@ -175,8 +214,6 @@ private:
 
     unsigned long tempoRetoObstaculoOrbita;
 
-    // Número de leituras consecutivas com preto
-    // necessárias para confirmar a linha.
     int leiturasPretasObstaculo;
 
 
@@ -211,6 +248,10 @@ private:
     );
 
 
+    // --------------------------------------------------------
+    // Giro normal
+    // --------------------------------------------------------
+
     void iniciarGiro(
         AcaoGiro acao
     );
@@ -222,10 +263,58 @@ private:
 
 
     // --------------------------------------------------------
+    // Curva verde
+    // --------------------------------------------------------
+
+    void iniciarGiroVerde(
+        AcaoGiro acao
+    );
+
+
+    void processarGiroVerde45(
+        const LinhaData& linha
+    );
+
+
+    void processarCurvaVerdeContinua(
+        const LinhaData& linha
+    );
+
+
+    void iniciarCorrecaoCurvaVerde(
+        const LinhaData& linha
+    );
+
+
+    void processarCorrecaoCurvaVerde(
+        const LinhaData& linha
+    );
+
+
+    bool sensorCentralEncontrouPreto(
+        const LinhaData& linha
+    );
+
+
+    bool sensorCentroNaLinha(
+        const LinhaData& linha
+    );
+
+
+    AcaoGiro determinarDirecaoCorrecao(
+        const LinhaData& linha
+    );
+
+
+    // --------------------------------------------------------
     // Curva preta
     // --------------------------------------------------------
 
     void iniciarCurvaPreta();
+
+    void processarAvancoCurvaPreta();
+
+    void iniciarRotacaoCurvaPreta();
 
     void processarCurvaPreta(
         const LinhaData& linha

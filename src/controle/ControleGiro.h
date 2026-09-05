@@ -101,13 +101,35 @@ public:
     void update();
 
 
+    // ========================================================
+    // Giros com alvo angular
+    // ========================================================
+
     void curva90Direita();
 
     void curva90Esquerda();
 
     void curva180();
 
+    void curva45Direita();
+
+    void curva45Esquerda();
+
     void girar(float angulo);
+
+
+    // ========================================================
+    // Giro contínuo
+    //
+    // Não possui alvo angular.
+    // Continua girando até que a camada superior mande parar.
+    // ========================================================
+
+    void giroContinuoDireita(int velocidade = 100);
+
+    void giroContinuoEsquerda(int velocidade = 100);
+
+    void pararGiroContinuo();
 
 
     bool executando();
